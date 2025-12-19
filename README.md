@@ -7,7 +7,11 @@ Give complex DIPS Arena calc expressions the same polish you expect from code. T
 - **Clean formatting** – Convert dense expressions into a well-indented layout that is easy to scan.
 - **One-click minify** – Run `DIPS Calc: Minify Document or Selection` from the Command Palette when you need a single-line version.
 - **Real-time IntelliSense** – Start typing and get completions for common calc functions with signature help.
-- **Variable autocomplete** – Type `$` to see available variables from `form_description.json` in the same folder hierarchy.
+- **Smart function wrapping** – Type a function name before an expression (like `ISNULL` before `$myVar`) and it wraps automatically.
+- **Variable autocomplete** – Type `$` to see available variables from `form_description.json` with their data types.
+- **Path autocomplete** – Type `/` after a variable to get path suggestions (e.g., `$quantity/magnitude`).
+- **Value autocomplete** – Type `"` after `$variable =` to see allowed values for coded text fields.
+- **Live diagnostics** – Get warnings for incorrect argument counts, type mismatches, and missing commas.
 - **Syntax-aware highlighting** – Colours functions, variables, strings, booleans, and numbers so the important bits stand out.
 - **File explorer integration** – `.calc` files show a dedicated icon for quick visual recognition.
 
@@ -23,7 +27,7 @@ Give complex DIPS Arena calc expressions the same polish you expect from code. T
 ## Everyday Use
 
 1. Save or open a file with the `.calc` extension (or pick **DIPS Calc Expression** in the language mode picker).
-2. Paste or type your expression. The extension formats on paste automatically; you can also run **Format Document** at any time.
+2. Paste or type your expression. Run **Format Document** (`Shift+Alt+F`) to beautify it.
 3. Add comments using `//` to document your expressions - these are for your reference in the editor only.
 4. Need the compact version? Press `Ctrl+Shift+P` / `Cmd+Shift+P`, run **DIPS Calc: Minify Document or Selection**, and copy the result.
 5. Before copying to DIPS Arena, run **DIPS Calc: Strip Comments** to remove all comments (DIPS Arena does not support comments natively).
@@ -45,7 +49,7 @@ The extension ships with sensible defaults for calc expression editing. Override
 "[dips-calc]": {
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
-  "editor.formatOnPaste": true
+  "editor.formatOnPaste": false
 }
 ```
 
@@ -57,12 +61,41 @@ This means you get IntelliSense for all the field variables defined in your DIPS
 
 1. Place your `.calc` file in the same folder as your `form_description.json`, or in a direct subfolder.
 2. Type `$` to trigger autocomplete.
-3. Variables from the form description appear first (marked as "from form_description.json").
+3. Variables from the form description appear first, showing their name and data type.
 4. Variables already used in the current document also appear in the list.
+
+### Path Completion
+
+After typing a variable name, type `/` to get path suggestions based on the variable's data type:
+
+- `$quantity/magnitude` – Get the numeric value of a DV_QUANTITY
+- `$quantity/units` – Get the unit string
+- `$coded/defining_code/code_string` – Get the code value of a DV_CODED_TEXT
+- `$ordinal/value` – Get the integer value of a DV_ORDINAL
+
+### Value Completion
+
+For DV_CODED_TEXT and DV_ORDINAL fields that have defined values, type `"` after an equals sign to see allowed values:
+
+```
+$status = "  <-- triggers value completion
+```
 
 **Note:** Only the `form_description.json` in the same folder or immediate parent is used. This prevents accidentally picking up variables from unrelated forms elsewhere in your workspace.
 
 The cache is automatically refreshed when `form_description.json` changes.
+
+## Diagnostics
+
+The extension provides real-time feedback as you type:
+
+- **Argument count validation** – Errors when a function receives too few or too many arguments
+- **Type checking** – Warnings when argument types don't match (e.g., passing text where a number is expected)
+- **Missing comma detection** – Warnings when arguments appear to be missing a comma, with a quick fix (lightbulb) to insert it
+- **Unknown function warnings** – Highlights function names that aren't recognized
+- **ISNULL/GENERIC_FIELD validation** – Error when using `ISNULL()` with a GENERIC_FIELD variable, suggesting `ISBLANK()` instead
+
+Click the lightbulb or press `Ctrl+.` to see available quick fixes.
 
 ## Share Feedback
 

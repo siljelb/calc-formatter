@@ -4,14 +4,25 @@ All notable changes to the "DIPS Arena Calc Expression Formatter" extension will
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [0.3.0]
 ### Added
 - **form_description.json integration** - Variable autocomplete now reads `calcId` annotations from `form_description.json` files in the same folder or parent folders
 - Variables from form_description.json are shown with source information and sorted first in completions
 - File watcher automatically refreshes the cache when form_description.json changes
+- **Function wrapping** - Type a function name before an existing expression (e.g., type `ISNULL` before `$myVar`) and the expression is automatically wrapped: `ISNULL($myVar)`
+- **Function parameter validation** - Real-time diagnostics for incorrect argument counts with detailed error messages
+- **Type checking** - Warnings when argument types don't match expected parameter types (e.g., passing a boolean where a number is expected)
+- **Missing comma detection** - Warns when arguments appear to be missing a comma separator, with a quick fix to insert the comma
+- **Unknown function warnings** - Highlights unknown function names to catch typos
+- **ISNULL/GENERIC_FIELD validation** - Error when using `ISNULL()` with a GENERIC_FIELD variable (use `ISBLANK()` instead)
+- **Path completion** - Type `/` after a variable to get path suggestions based on the variable's data type (e.g., `$quantity/magnitude`, `$coded/defining_code/code_string`)
+- **Value completion** - Type `"` after `$variable =` to get autocomplete for allowed values from form_description.json (for DV_CODED_TEXT and DV_ORDINAL fields)
+- **Variable type display** - Variable completions now show the data type (Boolean, Quantity, Coded Text, etc.) in the completion list
 
 ### Changed
 - Variable completions now show source (from form_description.json vs from document)
+- **Format on paste disabled** - Automatic formatting on paste is now disabled by default. Use `Shift+Alt+F` to format manually.
 
 ## [0.2.0]
 ### Added

@@ -157,6 +157,111 @@ function activate(context) {
   
   const selector = { language: 'dips-calc', scheme: '*' };
 
+  // Command to wrap the expression after the cursor into the function call
+  // This is called via completion item's command property after insertion
+  const wrapExpressionCommand = vscode.commands.registerCommand('dips-calc.wrapExpression', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+    
+    const document = editor.document;
+    const position = editor.selection.active;
+    const line = document.lineAt(position.line).text;
+    
+    // We expect cursor to be inside empty parens: FUNC(|)
+    // Check if we're inside ()
+    if (position.character < 1) return;
+    
+    const charBefore = line[position.character - 1];
+    const charAfter = line[position.character];
+    
+    if (charBefore !== '(' || charAfter !== ')') return;
+    
+    // Get the text after the closing paren
+    const afterParen = line.substring(position.character + 1);
+    
+    // Try to match an expression to wrap
+    let expressionToWrap = null;
+    let expressionLength = 0;
+    
+    // Match variable: $name or $name/path
+    const varMatch = afterParen.match(/^(\$[A-Za-z_][A-Za-z0-9_]*(?:\/[A-Za-z_][A-Za-z0-9_]*)*)/);
+    if (varMatch) {
+      expressionToWrap = varMatch[1];
+      expressionLength = varMatch[1].length;
+    }
+    
+    // Match function call: FUNC(...)
+    if (!expressionToWrap) {
+      const funcStartMatch = afterParen.match(/^([A-Z][A-Z0-9_]*)\s*\(/i);
+      if (funcStartMatch) {
+        let depth = 1;
+        let i = funcStartMatch[0].length;
+        let inString = false;
+        let stringChar = '';
+        
+        while (i < afterParen.length && depth > 0) {
+          const char = afterParen[i];
+          const prevChar = i > 0 ? afterParen[i - 1] : '';
+          
+          if ((char === '"' || char === "'") && prevChar !== '\\') {
+            if (!inString) {
+              inString = true;
+              stringChar = char;
+            } else if (char === stringChar) {
+              inString = false;
+            }
+          } else if (!inString) {
+            if (char === '(') depth++;
+            else if (char === ')') depth--;
+          }
+          i++;
+        }
+        
+        if (depth === 0) {
+          expressionToWrap = afterParen.substring(0, i);
+          expressionLength = i;
+        }
+      }
+    }
+    
+    // Match number
+    if (!expressionToWrap) {
+      const numMatch = afterParen.match(/^(\d+\.?\d*)/);
+      if (numMatch) {
+        expressionToWrap = numMatch[1];
+        expressionLength = numMatch[1].length;
+      }
+    }
+    
+    // Match identifier (but not if followed by opening paren)
+    if (!expressionToWrap) {
+      const idMatch = afterParen.match(/^([A-Za-z_][A-Za-z0-9_]*)(?!\s*\()/);
+      if (idMatch) {
+        expressionToWrap = idMatch[1];
+        expressionLength = idMatch[1].length;
+      }
+    }
+    
+    if (!expressionToWrap) return;
+    
+    // Now perform the edit:
+    // 1. Delete the expression from after the )
+    // 2. Insert it inside the ()
+    const exprStartPos = new vscode.Position(position.line, position.character + 1);
+    const exprEndPos = new vscode.Position(position.line, position.character + 1 + expressionLength);
+    
+    await editor.edit(editBuilder => {
+      // Delete the expression from after the paren
+      editBuilder.delete(new vscode.Range(exprStartPos, exprEndPos));
+      // Insert it at the cursor position (inside the parens)
+      editBuilder.insert(position, expressionToWrap);
+    });
+    
+    // Move cursor to after the closing paren
+    const newCursorPos = new vscode.Position(position.line, position.character + expressionToWrap.length + 1);
+    editor.selection = new vscode.Selection(newCursorPos, newCursorPos);
+  });
+
   // Autocomplete provider built from FUNCTION_ITEMS above.
   const completionProvider = vscode.languages.registerCompletionItemProvider(
     selector,
@@ -164,6 +269,7 @@ function activate(context) {
       provideCompletionItems(document, position) {
         const lineText = document.lineAt(position.line).text;
         const linePrefix = lineText.substring(0, position.character);
+        const lineSuffix = lineText.substring(position.character);
         
         // Don't provide function completions if user already typed opening parenthesis
         if (linePrefix.match(/[A-Za-z_][A-Za-z0-9_]*\s*\($/)) {
@@ -175,6 +281,76 @@ function activate(context) {
           return [];
         }
         
+        // Find the word prefix that the user is typing (for setting the replace range)
+        const wordPrefixMatch = linePrefix.match(/([A-Za-z_][A-Za-z0-9_]*)$/);
+        const wordPrefix = wordPrefixMatch ? wordPrefixMatch[1] : '';
+        const replaceStartPos = new vscode.Position(position.line, position.character - wordPrefix.length);
+        
+        // Check if there's an expression immediately after the cursor that we should wrap
+        // This matches: $variable, $variable/path, FUNCTION(...), identifier, or number
+        let expressionToWrap = null;
+        let expressionEndPos = position;
+        
+        // Match variable: $name or $name/path
+        const varMatch = lineSuffix.match(/^(\$[A-Za-z_][A-Za-z0-9_]*(?:\/[A-Za-z_][A-Za-z0-9_]*)*)/);
+        if (varMatch) {
+          expressionToWrap = varMatch[1];
+          expressionEndPos = new vscode.Position(position.line, position.character + varMatch[1].length);
+        }
+        
+        // Match function call: FUNC(...) - need to find matching closing paren
+        if (!expressionToWrap) {
+          const funcStartMatch = lineSuffix.match(/^([A-Z][A-Z0-9_]*)\s*\(/i);
+          if (funcStartMatch) {
+            // Find the matching closing parenthesis
+            let depth = 1;
+            let i = funcStartMatch[0].length;
+            let inString = false;
+            let stringChar = '';
+            
+            while (i < lineSuffix.length && depth > 0) {
+              const char = lineSuffix[i];
+              const prevChar = i > 0 ? lineSuffix[i - 1] : '';
+              
+              if ((char === '"' || char === "'") && prevChar !== '\\') {
+                if (!inString) {
+                  inString = true;
+                  stringChar = char;
+                } else if (char === stringChar) {
+                  inString = false;
+                }
+              } else if (!inString) {
+                if (char === '(') depth++;
+                else if (char === ')') depth--;
+              }
+              i++;
+            }
+            
+            if (depth === 0) {
+              expressionToWrap = lineSuffix.substring(0, i);
+              expressionEndPos = new vscode.Position(position.line, position.character + i);
+            }
+          }
+        }
+        
+        // Match number
+        if (!expressionToWrap) {
+          const numMatch = lineSuffix.match(/^(\d+\.?\d*)/);
+          if (numMatch) {
+            expressionToWrap = numMatch[1];
+            expressionEndPos = new vscode.Position(position.line, position.character + numMatch[1].length);
+          }
+        }
+        
+        // Match identifier (but not if followed by opening paren - that's a function call handled above)
+        if (!expressionToWrap) {
+          const idMatch = lineSuffix.match(/^([A-Za-z_][A-Za-z0-9_]*)(?!\s*\()/);
+          if (idMatch) {
+            expressionToWrap = idMatch[1];
+            expressionEndPos = new vscode.Position(position.line, position.character + idMatch[1].length);
+          }
+        }
+        
         const items = FUNCTION_ITEMS.map(fn => {
           const item = new vscode.CompletionItem(fn.name, vscode.CompletionItemKind.Function);
           item.detail = fn.signature;
@@ -184,10 +360,27 @@ function activate(context) {
           // Functions without args have "()" directly, functions with args have something inside
           const hasArgs = !fn.signature.match(/\(\s*\)$/);
           
-          if (hasArgs) {
+          // Use filterText to control what the user types to match this completion
+          item.filterText = fn.name;
+          
+          if (expressionToWrap && hasArgs) {
+            // Use a post-completion command to wrap the expression
+            // The completion inserts FUNC() with cursor inside parens via $0
+            // Then the command detects the expression after ) and moves it inside
+            item.range = new vscode.Range(replaceStartPos, position);
+            item.insertText = new vscode.SnippetString(`${fn.name}($0)`);
+            item.command = {
+              command: 'dips-calc.wrapExpression',
+              title: 'Wrap Expression'
+            };
+          } else if (hasArgs) {
+            // No wrapping - just replace the typed prefix
+            item.range = new vscode.Range(replaceStartPos, position);
             // Place cursor inside parentheses: FUNC(|)
             item.insertText = new vscode.SnippetString(`${fn.name}($0)`);
           } else {
+            // No args - just replace the typed prefix
+            item.range = new vscode.Range(replaceStartPos, position);
             // Place cursor after parentheses: FUNC()|
             item.insertText = new vscode.SnippetString(`${fn.name}()$0`);
           }
@@ -669,7 +862,800 @@ function activate(context) {
     formDescriptionCache.delete(folderPath);
   });
 
+  // Diagnostics collection for function parameter validation
+  const diagnosticCollection = vscode.languages.createDiagnosticCollection('dips-calc');
+  
+  /**
+   * Count function arguments, handling nested parentheses and strings correctly.
+   * @param {string} argsString - The string inside the function parentheses
+   * @returns {number} - Number of arguments (0 for empty, otherwise count commas at depth 0 + 1)
+   */
+  function countFunctionArguments(argsString) {
+    const trimmed = argsString.trim();
+    if (trimmed === '') {
+      return 0;
+    }
+    
+    let depth = 0;
+    let inString = false;
+    let stringChar = '';
+    let argCount = 1;
+    
+    for (let i = 0; i < trimmed.length; i++) {
+      const char = trimmed[i];
+      const prevChar = i > 0 ? trimmed[i - 1] : '';
+      
+      // Handle string literals
+      if ((char === '"' || char === "'") && prevChar !== '\\') {
+        if (!inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar) {
+          inString = false;
+        }
+        continue;
+      }
+      
+      if (inString) continue;
+      
+      // Track nested parentheses
+      if (char === '(') {
+        depth++;
+      } else if (char === ')') {
+        depth--;
+      } else if (char === ',' && depth === 0) {
+        argCount++;
+      }
+    }
+    
+    return argCount;
+  }
+
+  /**
+   * Extract individual arguments from an arguments string.
+   * @param {string} argsString - The string inside the function parentheses
+   * @returns {Array<{text: string, start: number, end: number}>} - Array of argument info
+   */
+  function extractFunctionArguments(argsString) {
+    const trimmed = argsString.trim();
+    if (trimmed === '') {
+      return [];
+    }
+    
+    const args = [];
+    let depth = 0;
+    let inString = false;
+    let stringChar = '';
+    let argStart = 0;
+    
+    for (let i = 0; i <= trimmed.length; i++) {
+      const char = i < trimmed.length ? trimmed[i] : ','; // Treat end as comma
+      const prevChar = i > 0 ? trimmed[i - 1] : '';
+      
+      // Handle string literals
+      if ((char === '"' || char === "'") && prevChar !== '\\') {
+        if (!inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar) {
+          inString = false;
+        }
+        continue;
+      }
+      
+      if (inString) continue;
+      
+      // Track nested parentheses
+      if (char === '(') {
+        depth++;
+      } else if (char === ')') {
+        depth--;
+      } else if ((char === ',' && depth === 0) || i === trimmed.length) {
+        const argText = trimmed.substring(argStart, i).trim();
+        args.push({
+          text: argText,
+          start: argStart,
+          end: i
+        });
+        argStart = i + 1;
+      }
+    }
+    
+    return args;
+  }
+
+  /**
+   * Type compatibility rules - which types can be used where another is expected.
+   */
+  const TYPE_COMPATIBILITY = {
+    // number accepts: number, integer
+    'number': ['number', 'integer', 'any'],
+    // integer accepts: integer only
+    'integer': ['integer', 'number', 'any'],
+    // text accepts: text, iso8601_datetime, iso8601_date, iso8601_time, iso8601_duration
+    'text': ['text', 'iso8601_datetime', 'iso8601_date', 'iso8601_time', 'iso8601_duration', 'any'],
+    // boolean accepts: boolean only
+    'boolean': ['boolean', 'any'],
+    // ticks is numeric
+    'ticks': ['ticks', 'number', 'integer', 'any'],
+    // datetime accepts: datetime
+    'datetime': ['datetime', 'any'],
+    // ISO types
+    'iso8601_datetime': ['iso8601_datetime', 'text', 'any'],
+    'iso8601_date': ['iso8601_date', 'text', 'any'],
+    'iso8601_time': ['iso8601_time', 'text', 'any'],
+    'iso8601_duration': ['iso8601_duration', 'text', 'any'],
+    // any accepts everything
+    'any': ['any', 'number', 'integer', 'text', 'boolean', 'ticks', 'datetime', 
+            'iso8601_datetime', 'iso8601_date', 'iso8601_time', 'iso8601_duration', 'null'],
+    // null
+    'null': ['null', 'any']
+  };
+
+  /**
+   * Check if a given type is compatible with an expected type.
+   * @param {string} givenType - The type that was provided
+   * @param {string} expectedType - The type that was expected
+   * @returns {boolean}
+   */
+  function isTypeCompatible(givenType, expectedType) {
+    if (!givenType || !expectedType) return true;
+    if (givenType === expectedType) return true;
+    if (expectedType === 'any') return true;
+    if (givenType === 'any') return true;
+    
+    const compatibleTypes = TYPE_COMPATIBILITY[expectedType];
+    if (compatibleTypes) {
+      return compatibleTypes.includes(givenType);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Infer the type of an expression.
+   * @param {string} expr - The expression to analyze
+   * @param {Map<string, VariableInfo>} variables - Variables from form_description.json
+   * @returns {{type: string|null, confidence: 'high'|'medium'|'low'}}
+   */
+  function inferExpressionType(expr, variables) {
+    const trimmed = expr.trim();
+    
+    // Empty expression
+    if (!trimmed) {
+      return { type: null, confidence: 'low' };
+    }
+    
+    // String literal
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      // Check if it looks like an ISO date/time
+      const content = trimmed.slice(1, -1);
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(content)) {
+        return { type: 'iso8601_datetime', confidence: 'high' };
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(content)) {
+        return { type: 'iso8601_date', confidence: 'high' };
+      }
+      if (/^\d{2}:\d{2}:\d{2}/.test(content)) {
+        return { type: 'iso8601_time', confidence: 'high' };
+      }
+      if (/^P(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$/.test(content)) {
+        return { type: 'iso8601_duration', confidence: 'high' };
+      }
+      return { type: 'text', confidence: 'high' };
+    }
+    
+    // Numeric literal
+    if (/^-?\d+$/.test(trimmed)) {
+      return { type: 'integer', confidence: 'high' };
+    }
+    if (/^-?\d+\.\d+$/.test(trimmed)) {
+      return { type: 'number', confidence: 'high' };
+    }
+    
+    // Boolean literals
+    if (/^(true|false)$/i.test(trimmed)) {
+      return { type: 'boolean', confidence: 'high' };
+    }
+    
+    // Variable reference
+    if (trimmed.startsWith('$')) {
+      const varName = trimmed.replace(/^[$]/, '').split('/')[0];
+      const varInfo = variables?.get(varName);
+      if (varInfo?.rmType) {
+        const rmTypeMapping = {
+          'DV_DATE_TIME': 'iso8601_datetime',
+          'DV_DATE': 'iso8601_date',
+          'DV_TIME': 'iso8601_time',
+          'DV_DURATION': 'iso8601_duration',
+          'DV_QUANTITY': 'number',
+          'DV_COUNT': 'integer',
+          'DV_PROPORTION': 'number',
+          'DV_ORDINAL': 'integer',
+          'DV_BOOLEAN': 'boolean',
+          'DV_TEXT': 'text',
+          'DV_CODED_TEXT': 'text',
+          'DV_IDENTIFIER': 'text',
+          'DV_URI': 'text'
+        };
+        const mappedType = rmTypeMapping[varInfo.rmType];
+        if (mappedType) {
+          return { type: mappedType, confidence: 'high' };
+        }
+      }
+      return { type: null, confidence: 'low' };
+    }
+    
+    // Function call - infer from function's return type
+    const funcMatch = trimmed.match(/^([A-Z][A-Z0-9_]*)\s*\(/i);
+    if (funcMatch) {
+      const funcName = funcMatch[1].toUpperCase();
+      const funcInfo = FUNCTION_LOOKUP.get(funcName);
+      if (funcInfo?.returns) {
+        return { type: funcInfo.returns, confidence: 'high' };
+      }
+    }
+    
+    // Comparison operators return boolean
+    if (/[<>=]|<>|>=|<=/.test(trimmed)) {
+      return { type: 'boolean', confidence: 'medium' };
+    }
+    
+    // Arithmetic expression (contains +, -, *, /, ^) - likely number
+    if (/[+\-*\/^%]/.test(trimmed) && !/["']/.test(trimmed)) {
+      return { type: 'number', confidence: 'medium' };
+    }
+    
+    // & is string concatenation
+    if (trimmed.includes('&')) {
+      return { type: 'text', confidence: 'medium' };
+    }
+    
+    return { type: null, confidence: 'low' };
+  }
+
+  /**
+   * Get a human-readable type description.
+   * @param {string} type 
+   * @returns {string}
+   */
+  function formatTypeName(type) {
+    const typeNames = {
+      'number': 'number',
+      'integer': 'integer',
+      'text': 'text',
+      'boolean': 'boolean',
+      'ticks': 'ticks (numeric timestamp)',
+      'datetime': 'datetime',
+      'iso8601_datetime': 'ISO 8601 datetime string',
+      'iso8601_date': 'ISO 8601 date string',
+      'iso8601_time': 'ISO 8601 time string',
+      'iso8601_duration': 'ISO 8601 duration string',
+      'any': 'any',
+      'null': 'null'
+    };
+    return typeNames[type] || type;
+  }
+  
+  /**
+   * Parse function calls from document text and validate arguments.
+   * @param {vscode.TextDocument} document 
+   * @param {Map<string, VariableInfo>} variables - Variables from form_description.json
+   * @returns {vscode.Diagnostic[]}
+   */
+  function validateFunctionCalls(document, variables) {
+    const text = document.getText();
+    const diagnostics = [];
+    
+    // Match function calls: FUNCTIONNAME(...)
+    // This regex finds function names followed by opening parenthesis
+    const functionCallRegex = /\b([A-Z][A-Z0-9_]*)\s*\(/gi;
+    
+    let match;
+    while ((match = functionCallRegex.exec(text)) !== null) {
+      const funcName = match[1].toUpperCase();
+      const funcInfo = FUNCTION_LOOKUP.get(funcName);
+      
+      // Find the matching closing parenthesis first (needed for both known and unknown functions)
+      const openParenIndex = match.index + match[0].length - 1;
+      let depth = 1;
+      let closeParenIndex = -1;
+      let inString = false;
+      let stringChar = '';
+      
+      for (let i = openParenIndex + 1; i < text.length && depth > 0; i++) {
+        const char = text[i];
+        const prevChar = i > 0 ? text[i - 1] : '';
+        
+        // Handle string literals
+        if ((char === '"' || char === "'") && prevChar !== '\\') {
+          if (!inString) {
+            inString = true;
+            stringChar = char;
+          } else if (char === stringChar) {
+            inString = false;
+          }
+          continue;
+        }
+        
+        if (inString) continue;
+        
+        if (char === '(') {
+          depth++;
+        } else if (char === ')') {
+          depth--;
+          if (depth === 0) {
+            closeParenIndex = i;
+          }
+        }
+      }
+      
+      if (!funcInfo) {
+        // Unknown function - add warning
+        // Only warn if closing paren was found (valid function call syntax)
+        if (closeParenIndex !== -1) {
+          const startPos = document.positionAt(match.index);
+          const endPos = document.positionAt(closeParenIndex + 1);
+          const range = new vscode.Range(startPos, endPos);
+          
+          const diagnostic = new vscode.Diagnostic(
+            range,
+            `Unknown function: ${match[1]}`,
+            vscode.DiagnosticSeverity.Warning
+          );
+          diagnostic.source = 'dips-calc';
+          diagnostic.code = 'unknown-function';
+          diagnostics.push(diagnostic);
+        }
+        continue;
+      }
+      
+      if (closeParenIndex === -1) {
+        // Unclosed parenthesis - skip this function call
+        continue;
+      }
+      
+      // Extract arguments string
+      const argsString = text.substring(openParenIndex + 1, closeParenIndex);
+      const argCount = countFunctionArguments(argsString);
+      
+      // Validate argument count
+      // maxArgs can be a number or '*' for unlimited
+      const minArgs = funcInfo.minArgs !== undefined ? funcInfo.minArgs : 0;
+      const maxArgs = funcInfo.maxArgs;
+      const isVariadic = maxArgs === '*';
+      
+      let message = null;
+      let severity = vscode.DiagnosticSeverity.Error;
+      
+      if (argCount < minArgs) {
+        if (!isVariadic && minArgs === maxArgs) {
+          message = `${funcName} expects exactly ${minArgs} argument${minArgs !== 1 ? 's' : ''}, but got ${argCount}`;
+        } else {
+          message = `${funcName} expects at least ${minArgs} argument${minArgs !== 1 ? 's' : ''}, but got ${argCount}`;
+        }
+      } else if (!isVariadic && argCount > maxArgs) {
+        if (minArgs === maxArgs) {
+          message = `${funcName} expects exactly ${maxArgs} argument${maxArgs !== 1 ? 's' : ''}, but got ${argCount}`;
+        } else {
+          message = `${funcName} expects at most ${maxArgs} argument${maxArgs !== 1 ? 's' : ''}, but got ${argCount}`;
+        }
+      }
+      
+      if (message) {
+        // Create range for the function call (from function name to closing paren)
+        const startPos = document.positionAt(match.index);
+        const endPos = document.positionAt(closeParenIndex + 1);
+        const range = new vscode.Range(startPos, endPos);
+        
+        const diagnostic = new vscode.Diagnostic(range, message, severity);
+        diagnostic.source = 'dips-calc';
+        diagnostic.code = 'invalid-argument-count';
+        diagnostics.push(diagnostic);
+      }
+      
+      // Special validation: ISNULL should not be used with GENERIC_FIELD variables
+      // GENERIC_FIELD variables require ISBLANK() instead
+      if (funcName === 'ISNULL' && !message) {
+        const args = extractFunctionArguments(argsString);
+        if (args.length > 0) {
+          const firstArg = args[0].text.trim();
+          // Check if the argument is a variable reference
+          if (firstArg.startsWith('$')) {
+            const varName = firstArg.replace(/^[$]/, '').split('/')[0];
+            const varInfo = variables?.get(varName);
+            if (varInfo?.rmType === 'GENERIC_FIELD') {
+              const startPos = document.positionAt(match.index);
+              const endPos = document.positionAt(closeParenIndex + 1);
+              const range = new vscode.Range(startPos, endPos);
+              
+              const diagnostic = new vscode.Diagnostic(
+                range,
+                `ISNULL() does not work with GENERIC_FIELD variables. Use ISBLANK(${firstArg}) instead.`,
+                vscode.DiagnosticSeverity.Error
+              );
+              diagnostic.source = 'dips-calc';
+              diagnostic.code = 'isnull-generic-field';
+              diagnostics.push(diagnostic);
+            }
+          }
+        }
+      }
+      
+      // Type validation - only if argument count is valid
+      if (!message && funcInfo.params && funcInfo.params.length > 0) {
+        const args = extractFunctionArguments(argsString);
+        
+        for (let i = 0; i < args.length; i++) {
+          const arg = args[i];
+          
+          // Determine expected type for this parameter
+          let expectedParam;
+          if (i < funcInfo.params.length) {
+            expectedParam = funcInfo.params[i];
+          } else if (isVariadic && funcInfo.params.length > 0) {
+            // For variadic functions, use the last non-optional param type or find the repeating param
+            // Most variadic functions repeat the pattern of their last few params
+            const lastParam = funcInfo.params[funcInfo.params.length - 1];
+            if (lastParam.optional) {
+              expectedParam = lastParam;
+            } else {
+              // Find the first optional param's type for extra args
+              const optionalParam = funcInfo.params.find(p => p.optional);
+              expectedParam = optionalParam || lastParam;
+            }
+          } else {
+            // Extra args beyond what's defined - skip type checking
+            continue;
+          }
+          
+          if (!expectedParam || expectedParam.type === 'any') {
+            continue;
+          }
+          
+          // Infer type of the provided argument
+          const inferredType = inferExpressionType(arg.text, variables);
+          
+          // Only report type errors for high confidence inferences
+          if (inferredType.type && inferredType.confidence === 'high') {
+            if (!isTypeCompatible(inferredType.type, expectedParam.type)) {
+              // Calculate the position of this specific argument
+              const argStartInDoc = openParenIndex + 1 + argsString.indexOf(arg.text);
+              const argEndInDoc = argStartInDoc + arg.text.length;
+              
+              const argStartPos = document.positionAt(argStartInDoc);
+              const argEndPos = document.positionAt(argEndInDoc);
+              const argRange = new vscode.Range(argStartPos, argEndPos);
+              
+              const typeMessage = `Argument ${i + 1} (${expectedParam.name}): expected ${formatTypeName(expectedParam.type)}, but got ${formatTypeName(inferredType.type)}`;
+              
+              const typeDiagnostic = new vscode.Diagnostic(
+                argRange,
+                typeMessage,
+                vscode.DiagnosticSeverity.Warning
+              );
+              typeDiagnostic.source = 'dips-calc';
+              typeDiagnostic.code = 'type-mismatch';
+              diagnostics.push(typeDiagnostic);
+            }
+          }
+        }
+      }
+    }
+    
+    return diagnostics;
+  }
+  
+  /**
+   * Update diagnostics for a document.
+   * @param {vscode.TextDocument} document 
+   */
+  function updateDiagnostics(document) {
+    if (document.languageId !== 'dips-calc') {
+      return;
+    }
+    
+    // Get variables from form_description.json for type inference
+    let variables = new Map();
+    if (document.uri.scheme === 'file') {
+      const formDescPath = findFormDescriptionJson(document.uri.fsPath);
+      if (formDescPath) {
+        variables = getVariablesFromFormDescription(formDescPath);
+      }
+    }
+    
+    const diagnostics = validateFunctionCalls(document, variables);
+    
+    // Also add diagnostics for missing commas
+    const missingCommas = detectMissingCommas(document);
+    for (const mc of missingCommas) {
+      const diagnostic = new vscode.Diagnostic(
+        mc.range,
+        'Possible missing comma between arguments',
+        vscode.DiagnosticSeverity.Warning
+      );
+      diagnostic.source = 'dips-calc';
+      diagnostic.code = 'missing-comma';
+      diagnostics.push(diagnostic);
+    }
+    
+    diagnosticCollection.set(document.uri, diagnostics);
+  }
+  
+  /**
+   * Detect potential missing commas between function arguments.
+   * Looks for patterns like: expression expression (without comma between)
+   * @param {vscode.TextDocument} document
+   * @returns {Array<{range: vscode.Range, insertPosition: vscode.Position}>}
+   */
+  function detectMissingCommas(document) {
+    const text = document.getText();
+    const missingCommas = [];
+    
+    // Find all function calls and check their arguments
+    const functionCallRegex = /\b([A-Z][A-Z0-9_]*)\s*\(/gi;
+    
+    let match;
+    while ((match = functionCallRegex.exec(text)) !== null) {
+      const openParenIndex = match.index + match[0].length - 1;
+      let depth = 1;
+      let closeParenIndex = -1;
+      let inString = false;
+      let stringChar = '';
+      
+      for (let i = openParenIndex + 1; i < text.length && depth > 0; i++) {
+        const char = text[i];
+        const prevChar = i > 0 ? text[i - 1] : '';
+        
+        if ((char === '"' || char === "'") && prevChar !== '\\') {
+          if (!inString) {
+            inString = true;
+            stringChar = char;
+          } else if (char === stringChar) {
+            inString = false;
+          }
+          continue;
+        }
+        
+        if (inString) continue;
+        
+        if (char === '(') {
+          depth++;
+        } else if (char === ')') {
+          depth--;
+          if (depth === 0) {
+            closeParenIndex = i;
+          }
+        }
+      }
+      
+      if (closeParenIndex === -1) continue;
+      
+      // Get the arguments text
+      const argsText = text.substring(openParenIndex + 1, closeParenIndex);
+      const argsStartOffset = openParenIndex + 1;
+      
+      // Tokenize the arguments to find adjacent tokens that should have a comma
+      // A missing comma is: TOKEN WHITESPACE TOKEN where no comma or operator is between
+      const tokenPattern = /(\$[A-Za-z_][A-Za-z0-9_./]*|[A-Za-z_][A-Za-z0-9_]*\s*\([^)]*\)|[A-Za-z_][A-Za-z0-9_]*|"[^"]*"|'[^']*'|\d+\.?\d*)/g;
+      
+      // Instead of complex tokenization, look for specific patterns that indicate missing commas
+      // Pattern: end of expression (variable, number, string, closing paren) followed by whitespace, then start of new expression
+      
+      // Simpler approach: scan through looking for whitespace gaps between value-like things
+      let argDepth = 0;
+      let argInString = false;
+      let argStringChar = '';
+      let lastValueEnd = -1; // Position after the last value token ended
+      
+      for (let i = 0; i < argsText.length; i++) {
+        const char = argsText[i];
+        const prevChar = i > 0 ? argsText[i - 1] : '';
+        
+        // Handle strings
+        if ((char === '"' || char === "'") && prevChar !== '\\') {
+          if (!argInString) {
+            // Starting a string
+            // Check if we should have had a comma before this
+            if (lastValueEnd !== -1) {
+              const gapText = argsText.substring(lastValueEnd, i);
+              // If gap is only whitespace (no comma, no operator), it's a missing comma
+              if (/^\s+$/.test(gapText)) {
+                const insertOffset = argsStartOffset + lastValueEnd;
+                const insertPos = document.positionAt(insertOffset);
+                // Create a range that includes the next token for better lightbulb visibility
+                // Find where the string ends
+                let stringEnd = i + 1;
+                while (stringEnd < argsText.length && argsText[stringEnd] !== char) {
+                  stringEnd++;
+                }
+                stringEnd++; // Include closing quote
+                const rangeStart = document.positionAt(argsStartOffset + lastValueEnd);
+                const rangeEnd = document.positionAt(argsStartOffset + Math.min(stringEnd, argsText.length));
+                missingCommas.push({
+                  range: new vscode.Range(rangeStart, rangeEnd),
+                  insertPosition: insertPos
+                });
+              }
+            }
+            argInString = true;
+            argStringChar = char;
+          } else if (char === argStringChar) {
+            argInString = false;
+            lastValueEnd = i + 1;
+          }
+          continue;
+        }
+        
+        if (argInString) continue;
+        
+        // Track nested parentheses
+        if (char === '(') {
+          argDepth++;
+          continue;
+        }
+        if (char === ')') {
+          argDepth--;
+          if (argDepth === 0) {
+            lastValueEnd = i + 1;
+          }
+          continue;
+        }
+        
+        // Inside nested parens - don't analyze
+        if (argDepth > 0) continue;
+        
+        // Comma resets - we found a proper separator
+        if (char === ',') {
+          lastValueEnd = -1;
+          continue;
+        }
+        
+        // Operators reset - these are valid separators within an expression
+        if ('+-*/^&%=<>?:'.includes(char)) {
+          lastValueEnd = -1;
+          continue;
+        }
+        
+        // Two-char operators
+        if (i + 1 < argsText.length) {
+          const twoChar = argsText.substring(i, i + 2);
+          if (twoChar === '<>' || twoChar === '>=' || twoChar === '<=') {
+            lastValueEnd = -1;
+            i++; // Skip next char
+            continue;
+          }
+        }
+        
+        // Whitespace - just skip
+        if (/\s/.test(char)) {
+          continue;
+        }
+        
+        // Start of a value token: $variable, identifier, or number
+        if (char === '$' || /[A-Za-z_]/.test(char) || /\d/.test(char)) {
+          // Find end of this token first (we need it for the range)
+          let tokenEnd = i;
+          if (char === '$') {
+            // Variable: $name or $name/path
+            tokenEnd++;
+            while (tokenEnd < argsText.length && /[A-Za-z0-9_./]/.test(argsText[tokenEnd])) {
+              tokenEnd++;
+            }
+          } else if (/[A-Za-z_]/.test(char)) {
+            // Identifier - could be a function call
+            while (tokenEnd < argsText.length && /[A-Za-z0-9_]/.test(argsText[tokenEnd])) {
+              tokenEnd++;
+            }
+            // Check if followed by ( - it's a function call, will be handled by depth tracking
+            // Skip whitespace to check
+            let checkPos = tokenEnd;
+            while (checkPos < argsText.length && /\s/.test(argsText[checkPos])) {
+              checkPos++;
+            }
+            if (argsText[checkPos] === '(') {
+              // It's a function call - the ) will set lastValueEnd
+              i = tokenEnd - 1;
+              continue;
+            }
+          } else {
+            // Number
+            while (tokenEnd < argsText.length && /[\d.]/.test(argsText[tokenEnd])) {
+              tokenEnd++;
+            }
+          }
+          
+          // Check if we should have had a comma before this
+          if (lastValueEnd !== -1) {
+            const gapText = argsText.substring(lastValueEnd, i);
+            // If gap is only whitespace (no comma, no operator), it's a missing comma
+            if (/^\s+$/.test(gapText)) {
+              const insertOffset = argsStartOffset + lastValueEnd;
+              const insertPos = document.positionAt(insertOffset);
+              // Create a range that includes the next token for better lightbulb visibility
+              const rangeStart = document.positionAt(argsStartOffset + lastValueEnd);
+              const rangeEnd = document.positionAt(argsStartOffset + tokenEnd);
+              missingCommas.push({
+                range: new vscode.Range(rangeStart, rangeEnd),
+                insertPosition: insertPos
+              });
+            }
+          }
+          
+          lastValueEnd = tokenEnd;
+          i = tokenEnd - 1; // -1 because loop will increment
+        }
+      }
+    }
+    
+    return missingCommas;
+  }
+  
+  // Code Action provider for quick fixes (missing comma insertion)
+  const codeActionProvider = vscode.languages.registerCodeActionsProvider(
+    selector,
+    {
+      provideCodeActions(document, range, context) {
+        const actions = [];
+        
+        // Collect missing-comma diagnostics
+        // First check context.diagnostics (passed by VS Code for diagnostics at cursor)
+        const diagnosticsToFix = [];
+        
+        for (const d of context.diagnostics) {
+          if (d.code === 'missing-comma') {
+            diagnosticsToFix.push(d);
+          }
+        }
+        
+        // If none found in context, check our diagnostic collection directly
+        // This handles cases where VS Code didn't pass the diagnostic
+        if (diagnosticsToFix.length === 0) {
+          const allDiagnostics = diagnosticCollection.get(document.uri) || [];
+          for (const diagnostic of allDiagnostics) {
+            if (diagnostic.code === 'missing-comma' && diagnostic.range.contains(range.start)) {
+              diagnosticsToFix.push(diagnostic);
+            }
+          }
+        }
+        
+        for (const diagnostic of diagnosticsToFix) {
+          const fix = new vscode.CodeAction(
+            'Insert missing comma',
+            vscode.CodeActionKind.QuickFix
+          );
+          fix.edit = new vscode.WorkspaceEdit();
+          
+          // Check if there's already whitespace after the insertion point
+          // The diagnostic range covers the whitespace gap, so we just insert a comma
+          // The existing whitespace will serve as the space after the comma
+          fix.edit.insert(document.uri, diagnostic.range.start, ',');
+          fix.isPreferred = true;
+          fix.diagnostics = [diagnostic];
+          actions.push(fix);
+        }
+        
+        return actions;
+      }
+    },
+    {
+      providedCodeActionKinds: [vscode.CodeActionKind.QuickFix]
+    }
+  );
+  
+  // Update diagnostics when document opens or changes
   context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument(updateDiagnostics),
+    vscode.workspace.onDidChangeTextDocument(event => updateDiagnostics(event.document)),
+    vscode.workspace.onDidCloseTextDocument(doc => diagnosticCollection.delete(doc.uri))
+  );
+  
+  // Update diagnostics for all open documents on activation
+  vscode.workspace.textDocuments.forEach(updateDiagnostics);
+
+  context.subscriptions.push(
+    wrapExpressionCommand,
     completionProvider,
     variableCompletionProvider,
     valueCompletionProvider,
@@ -680,7 +1666,9 @@ function activate(context) {
     minifyCommand,
     beautifyCommand,
     stripCommentsCommand,
-    formDescWatcher
+    formDescWatcher,
+    diagnosticCollection,
+    codeActionProvider
   );
 }
 

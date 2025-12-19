@@ -94,7 +94,7 @@
       "[dips-calc]": {
         "editor.tabSize": 2,
         "editor.insertSpaces": true,
-        "editor.formatOnPaste": true
+        "editor.formatOnPaste": false
       }
     }
   },
