@@ -8,7 +8,7 @@ const FUNCTION_LOOKUP = new Map(
 
 // Entry point for the VS Code extension lifecycle.
 function activate(context) {
-  const selector = { language: 'excel-formula', scheme: '*' };
+  const selector = { language: 'dips-calc', scheme: '*' };
 
   // Autocomplete provider built from FUNCTION_ITEMS above.
   const completionProvider = vscode.languages.registerCompletionItemProvider(
@@ -73,7 +73,7 @@ function activate(context) {
       }
 
       const markdown = new vscode.MarkdownString();
-      markdown.appendCodeblock(metadata.signature, 'excel-formula');
+      markdown.appendCodeblock(metadata.signature, 'dips-calc');
       if (metadata.detail) {
         markdown.appendMarkdown(`\n\n${metadata.detail}`);
       }
@@ -83,24 +83,35 @@ function activate(context) {
   });
 
   // Command palette entry to collapse formulas to a compact representation.
-  const minifyCommand = vscode.commands.registerCommand('excel-formula.minifyFormula', async () => {
+  const minifyCommand = vscode.commands.registerCommand('dips-calc.minifyFormula', async () => {
     const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'excel-formula') {
-      vscode.window.showInformationMessage('Open an Excel Formula document before running minify.');
+    if (!editor || editor.document.languageId !== 'dips-calc') {
+      vscode.window.showInformationMessage('Open a DIPS Calc expression file before running minify.');
       return;
     }
 
     await transformDocumentOrSelection(editor, minifyFormula);
   });
 
-  const beautifyCommand = vscode.commands.registerCommand('excel-formula.beautifyFormula', async () => {
+  const beautifyCommand = vscode.commands.registerCommand('dips-calc.beautifyFormula', async () => {
     const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'excel-formula') {
-      vscode.window.showInformationMessage('Open an Excel Formula document before running beautify.');
+    if (!editor || editor.document.languageId !== 'dips-calc') {
+      vscode.window.showInformationMessage('Open a DIPS Calc expression file before running beautify.');
       return;
     }
 
     await transformDocumentOrSelection(editor, formatFormula);
+  });
+
+  const stripCommentsCommand = vscode.commands.registerCommand('dips-calc.stripComments', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.languageId !== 'dips-calc') {
+      vscode.window.showInformationMessage('Open a DIPS Calc expression file before stripping comments.');
+      return;
+    }
+
+    await transformDocumentOrSelection(editor, stripComments);
+    vscode.window.showInformationMessage('Comments stripped. The result is ready for use in DIPS Arena.');
   });
 
   context.subscriptions.push(
@@ -109,13 +120,14 @@ function activate(context) {
     rangeFormattingProvider,
     hoverProvider,
     minifyCommand,
-    beautifyCommand
+    beautifyCommand,
+    stripCommentsCommand
   );
 }
 
 function deactivate() {}
 
-// Friendly formatter that breaks multi-line formulas into readable chunks.
+// Friendly formatter that breaks multi-line expressions into readable chunks.
 function formatFormula(input) {
   if (!input.trim()) {
     return input;
@@ -134,14 +146,16 @@ function formatFormula(input) {
       groups.push(null);
       continue;
     }
-    if (trimmed.startsWith('=')) {
+    // Preserve comment lines as-is
+    if (trimmed.startsWith('//')) {
       if (current.length) {
         groups.push(current);
+        current = [];
       }
-      current = [trimmed];
-    } else {
-      current.push(trimmed);
+      groups.push(['__COMMENT__' + trimmed]);
+      continue;
     }
+    current.push(trimmed);
   }
 
   if (current.length) {
@@ -159,6 +173,11 @@ function formatFormula(input) {
       if (formattedLines.length && formattedLines[formattedLines.length - 1] !== '') {
         formattedLines.push('');
       }
+      return;
+    }
+    // Handle comment lines
+    if (section.length === 1 && section[0].startsWith('__COMMENT__')) {
+      formattedLines.push(section[0].slice('__COMMENT__'.length));
       return;
     }
     const formula = section.join(' ');
@@ -191,14 +210,16 @@ function minifyFormula(input) {
       groups.push(null);
       continue;
     }
-    if (trimmed.startsWith('=')) {
+    // Preserve comment lines as-is
+    if (trimmed.startsWith('//')) {
       if (current.length) {
         groups.push(current);
+        current = [];
       }
-      current = [trimmed];
-    } else {
-      current.push(trimmed);
+      groups.push(['__COMMENT__' + trimmed]);
+      continue;
     }
+    current.push(trimmed);
   }
 
   if (current.length) {
@@ -218,6 +239,11 @@ function minifyFormula(input) {
       }
       return;
     }
+    // Handle comment lines
+    if (section.length === 1 && section[0].startsWith('__COMMENT__')) {
+      minifiedLines.push(section[0].slice('__COMMENT__'.length));
+      return;
+    }
     const formula = section.join(' ');
     const minified = minifySingleFormula(formula);
     if (!minified) {
@@ -227,6 +253,78 @@ function minifyFormula(input) {
   });
 
   return minifiedLines.join('\n');
+}
+
+// Removes all // comments from the formula so it can be used in DIPS Arena
+// which does not support comments natively.
+function stripComments(input) {
+  if (!input.trim()) {
+    return input;
+  }
+
+  const lines = input.split(/\r?\n/);
+  const outputLines = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Skip lines that are only comments
+    if (trimmed.startsWith('//')) {
+      continue;
+    }
+    
+    // Remove inline comments (// at end of line)
+    const commentIndex = findCommentStart(line);
+    if (commentIndex !== -1) {
+      const withoutComment = line.substring(0, commentIndex).trimEnd();
+      if (withoutComment) {
+        outputLines.push(withoutComment);
+      }
+    } else {
+      outputLines.push(line);
+    }
+  }
+
+  // Remove trailing empty lines
+  while (outputLines.length && !outputLines[outputLines.length - 1].trim()) {
+    outputLines.pop();
+  }
+
+  return outputLines.join('\n');
+}
+
+// Find the start of a // comment, ignoring // inside strings
+function findCommentStart(line) {
+  let inString = false;
+  let stringChar = '';
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+
+    if (inString) {
+      if (ch === stringChar) {
+        // Check for escaped quote (doubled)
+        if (i + 1 < line.length && line[i + 1] === stringChar) {
+          i += 1;
+          continue;
+        }
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+      continue;
+    }
+
+    if (ch === '/' && line[i + 1] === '/') {
+      return i;
+    }
+  }
+
+  return -1;
 }
 
 // Removes optional whitespace while retaining separation between words/strings.
@@ -375,6 +473,8 @@ function tokenize(source) {
   const tokens = [];
   let buffer = '';
   let inString = false;
+  let stringChar = '';
+  let inBracket = false;
 
   const flushBuffer = () => {
     if (!buffer) {
@@ -387,10 +487,45 @@ function tokenize(source) {
   for (let i = 0; i < source.length; i += 1) {
     const ch = source[i];
 
+    // Handle line comments
+    if (!inString && !inBracket && ch === '/' && source[i + 1] === '/') {
+      flushBuffer();
+      let comment = '//';
+      i += 2;
+      while (i < source.length && source[i] !== '\n') {
+        comment += source[i];
+        i += 1;
+      }
+      tokens.push({ type: 'comment', value: comment });
+      if (i < source.length) {
+        i -= 1; // Let the main loop handle the newline
+      }
+      continue;
+    }
+
+    // Handle bracket variables like [VariableName]
+    if (!inString && ch === '[') {
+      flushBuffer();
+      buffer = '[';
+      inBracket = true;
+      continue;
+    }
+
+    if (inBracket) {
+      buffer += ch;
+      if (ch === ']') {
+        tokens.push({ type: 'word', value: buffer });
+        buffer = '';
+        inBracket = false;
+      }
+      continue;
+    }
+
     if (inString) {
       buffer += ch;
-      if (ch === '"') {
-        if (i + 1 < source.length && source[i + 1] === '"') {
+      if (ch === stringChar) {
+        // Check for escaped quote (doubled)
+        if (i + 1 < source.length && source[i + 1] === stringChar) {
           buffer += source[i + 1];
           i += 1;
           continue;
@@ -402,9 +537,10 @@ function tokenize(source) {
       continue;
     }
 
-    if (ch === '"') {
+    if (ch === '"' || ch === "'") {
       flushBuffer();
-      buffer = '"';
+      buffer = ch;
+      stringChar = ch;
       inString = true;
       continue;
     }
@@ -415,20 +551,20 @@ function tokenize(source) {
     }
 
     const twoChar = source.slice(i, i + 2);
-    if (twoChar === '>=' || twoChar === '<=' || twoChar === '<>') {
+    if (twoChar === '>=' || twoChar === '<=' || twoChar === '<>' || twoChar === '==' || twoChar === '!=' || twoChar === '&&' || twoChar === '||') {
       flushBuffer();
       tokens.push({ type: 'operator', value: twoChar });
       i += 1;
       continue;
     }
 
-    if (',;(){}'.includes(ch)) {
+    if (',;(){}[]'.includes(ch)) {
       flushBuffer();
       tokens.push({ type: 'punct', value: ch });
       continue;
     }
 
-    if ('+-*/^&=%'.includes(ch) || ['=', '>', '<'].includes(ch)) {
+    if ('+-*/^&%=><>!?:'.includes(ch)) {
       flushBuffer();
       tokens.push({ type: 'operator', value: ch });
       continue;
@@ -492,4 +628,5 @@ module.exports = {
   deactivate,
   _formatFormula: formatFormula,
   _minifyFormula: minifyFormula,
+  _stripComments: stripComments,
 };

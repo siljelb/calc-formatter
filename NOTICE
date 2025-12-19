@@ -1,0 +1,12 @@
+DIPS Arena Calc Expression Formatter
+Copyright 2025 siljelb
+
+This project is a derivative work based on:
+
+Excel Formula Formatter
+Copyright (c) 2025 Miguel Garay
+Licensed under the MIT License
+https://github.com/miguelangelcdm/excel-formula-formatter
+
+The original work has been modified to support DIPS Arena calc expressions
+instead of Excel formulas.

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "dips-calc",
+  "scopeName": "source.dips-calc",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#variables" },
+    { "include": "#functions" },
+    { "include": "#booleans" },
+    { "include": "#numbers" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "match": "//.*$",
+          "name": "comment.line.double-slash.dips-calc"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b(?=\\s*\\()",
+          "name": "support.function.dips-calc"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "match": "\\$[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*",
+          "name": "variable.other.predicate.dips-calc"
+        },
+        {
+          "match": "\\$[A-Za-z_][A-Za-z0-9_]*",
+          "name": "variable.other.dips-calc"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.string.begin.dips-calc" }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.dips-calc" }
+          },
+          "name": "string.quoted.double.dips-calc",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.dips-calc"
+            }
+          ]
+        },
+        {
+          "begin": "'",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.string.begin.dips-calc" }
+          },
+          "end": "'",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.dips-calc" }
+          },
+          "name": "string.quoted.single.dips-calc",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.dips-calc"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b",
+          "name": "constant.numeric.dips-calc"
+        }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        {
+          "match": "\\b(true|false|TRUE|FALSE|True|False)\\b",
+          "name": "constant.language.boolean.dips-calc"
+        },
+        {
+          "match": "\\b(null|NULL|Null)\\b",
+          "name": "constant.language.null.dips-calc"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "\\+|\\-|\\*|/|\\^|%|==|!=|>=|<=|>|<|&&|\\|\\||!|=",
+          "name": "keyword.operator.dips-calc"
+        },
+        {
+          "match": "\\?|:",
+          "name": "keyword.operator.ternary.dips-calc"
+        }
+      ]
+    }
+  }
+}

@@ -1,51 +1,49 @@
-# Excel Formula Formatter
+# DIPS Arena Calc Expression Formatter
 
 Give complex Excel formulas the same polish you expect from code. This Visual Studio Code extension keeps formulas readable, helps you explore function names, and now lets you collapse everything back down when you need compact copies.
 
 ## Why You'll Like It
 
-- **Clean formatting** – Convert dense formulas into a well-indented layout that is easy to scan.
-- **One-click minify** – Run `Excel Formula: Minify Document or Selection` from the Command Palette when you need a single-line version.
-- **Real-time IntelliSense** – Start typing and get completions for common Excel functions with signature help.
-- **Syntax-aware highlighting** – Colours functions, cell references, strings, booleans, and error literals so the important bits stand out.
-- **File explorer integration** – `.xlf` files show a dedicated Excel Formula icon for quick visual recognition.
+- **Clean formatting** – Convert dense expressions into a well-indented layout that is easy to scan.
+- **One-click minify** – Run `DIPS Calc: Minify Document or Selection` from the Command Palette when you need a single-line version.
+- **Real-time IntelliSense** – Start typing and get completions for common calc functions with signature help.
+- **Syntax-aware highlighting** – Colours functions, variables, strings, booleans, and numbers so the important bits stand out.
+- **File explorer integration** – `.calc` files show a dedicated icon for quick visual recognition.
 
 ## Install
 
 1. Open the Extensions view in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`).
-2. Search for **"Excel Formula Formatter"** and click **Install**.
-3. Reload the window if prompted and you're ready to format formulas.
+2. Search for **"DIPS Arena Calc Expression Formatter"** and click **Install**.
+3. Reload the window if prompted and you're ready to format expressions.
 
 ## Everyday Use
 
-1. Save or open a file with the `.xlf` extension (or pick **Excel Formula** in the language mode picker).
-2. Paste or type your formula. The extension formats on paste automatically; you can also run **Format Document** at any time.
-3. Need the compact version? Press `Ctrl+Shift+P` / `Cmd+Shift+P`, run **Excel Formula: Minify Document or Selection**, and copy the result.
-4. Trigger completions with `Ctrl+Space` to browse function snippets.
+1. Save or open a file with the `.calc` extension (or pick **DIPS Calc Expression** in the language mode picker).
+2. Paste or type your expression. The extension formats on paste automatically; you can also run **Format Document** at any time.
+3. Add comments using `//` to document your expressions - these are for your reference in the editor only.
+4. Need the compact version? Press `Ctrl+Shift+P` / `Cmd+Shift+P`, run **DIPS Calc: Minify Document or Selection**, and copy the result.
+5. Before copying to DIPS Arena, run **DIPS Calc: Strip Comments** to remove all comments (DIPS Arena does not support comments natively).
+6. Trigger completions with `Ctrl+Space` to browse function snippets.
 
 ## Commands
 
 | Command | Purpose |
 | ------- | ------- |
-| `Excel Formula: Minify Document or Selection` | Collapse the active selection or entire file into a single-line formula while preserving strings and operators. |
-| `Excel Formula: Beautify Document or Selection` | Manually beautify the selection ot the entire file. |
+| `DIPS Calc: Minify Document or Selection` | Collapse the active selection or entire file into a single-line expression while preserving strings and operators. |
+| `DIPS Calc: Beautify Document or Selection` | Manually beautify the selection or the entire file. |
+| `DIPS Calc: Strip Comments` | Remove all `//` comments from the document or selection. Use this before copying expressions to DIPS Arena, which does not support comments natively. |
 
 ## Configuration
 
-The extension ships with sensible defaults for Excel formula editing. Override them in your `settings.json` if you prefer a different setup:
+The extension ships with sensible defaults for calc expression editing. Override them in your `settings.json` if you prefer a different setup:
 
 ```json
-"[excel-formula]": {
+"[dips-calc]": {
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
   "editor.formatOnPaste": true
 }
 ```
-
-## Known Limitations
-
-- Array constants are expanded one element per line. Alternate layouts are planned.
-- Only built-in Excel functions are suggested today; custom workbook functions are not yet included.
 
 ## Share Feedback
 

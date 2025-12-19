@@ -37,20 +37,32 @@ const { _formatFormula: formatFormula } = sandbox.module.exports;
 
 const samples = [
   {
-    name: 'Basic IF',
-    input: '=IF(AND(A1>5,B1<10),SUM(C1:C10),0)'
+    name: 'Basic IF with variables',
+    input: 'IF(AND($age > 18, $score < 100), SUM($value1, $value2), 0)'
   },
   {
-    name: 'LET with FILTER',
-    input: '=LET(x, SUM(A1:A5), y, FILTER(B1:B5, B1:B5>0), x + SUM(y))'
+    name: 'Nested functions',
+    input: 'ROUND(AVERAGE($patient.value1, $patient.value2, $patient.value3), 2)'
   },
   {
-    name: 'Structured reference',
-    input: '=SUMIFS(Table1[Amount], Table1[Category], "Travel", Table1[Date], ">=" & DATE(2024,1,1))'
+    name: 'Age calculation',
+    input: 'AGE($patient.birthDateTicks, NOWTICKS())'
   },
   {
-    name: 'Array literal',
-    input: '=MMULT({1,2;3,4},TRANSPOSE({1;2}))'
+    name: 'Complex conditional',
+    input: 'IF(AND($status == "Active", $score > 80), "Approved", IF($score > 50, "Pending", "Rejected"))'
+  },
+  {
+    name: 'String functions',
+    input: 'CONCATENATE(UPPER(LEFT($firstName, 1)), LOWER(MID($firstName, 2, LEN($firstName) - 1)), " ", UPPER($lastName))'
+  },
+  {
+    name: 'Date functions',
+    input: 'FORMATDATETIME(NOWTICKS(), "D", "en-us")'
+  },
+  {
+    name: 'Null handling',
+    input: 'IFNULL($preferredName, IFNULL($firstName, "Unknown"))'
   }
 ];
 

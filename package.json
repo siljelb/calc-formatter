@@ -1,29 +1,27 @@
 {
-  "name": "excel-formula",
-  "displayName": "excel-formula-formatter",
-  "description": "VS Code extension to format, indent, and highlight Excel formulas",
-  "icon": "./icons/excel-formula-icon.png",
+  "name": "dips-calc-expression",
+  "displayName": "DIPS Arena Calc Expression Formatter",
+  "description": "VS Code extension to format, indent, and highlight DIPS Arena calc expressions",
+  "icon": "icons/calc-icon.png",
   "version": "0.1.0",
-  "publisher": "MiguelGaray",
-  "license": "MIT",
+  "publisher": "siljelb",
+  "license": "Apache-2.0",
   "keywords": [
-    "excel",
-    "formula",
+    "dips",
+    "arena",
+    "calc",
+    "expression",
     "formatter",
     "beautify",
     "minify",
-    "spreadsheet",
-    "office",
-    "xlf",
-    "powerquery",
-    "vba"
+    "healthcare"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/miguelangelcdm/excel-formula-formatter.git"
+    "url": "https://github.com/siljelb/calc-formatter.git"
   },
   "bugs": {
-    "url": "https://github.com/miguelangelcdm/excel-formula-formatter/issues"
+    "url": "https://github.com/siljelb/calc-formatter/issues"
   },
   "engines": {
     "vscode": "^1.104.0"
@@ -35,42 +33,47 @@
   "contributes": {
     "languages": [
       {
-        "id": "excel-formula",
+        "id": "dips-calc",
         "aliases": [
-          "excel-formula",
-          "excel-formula"
+          "DIPS Calc Expression",
+          "dips-calc"
         ],
         "extensions": [
-          ".xlf"
+          ".calc"
         ],
         "icon": {
-          "light": "./icons/excel-formula-light.svg",
-          "dark": "./icons/excel-formula-dark.svg"
+          "light": "./icons/calc-light.svg",
+          "dark": "./icons/calc-dark.svg"
         },
         "configuration": "./language-configuration.json"
       }
     ],
     "commands": [
       {
-        "command": "excel-formula.minifyFormula",
+        "command": "dips-calc.minifyFormula",
         "title": "Minify Document or Selection",
-        "category": "Excel Formula"
+        "category": "DIPS Calc"
       },
       {
-        "command": "excel-formula.beautifyFormula",
+        "command": "dips-calc.beautifyFormula",
         "title": "Beautify Document or Selection",
-        "category": "Excel Formula"
+        "category": "DIPS Calc"
+      },
+      {
+        "command": "dips-calc.stripComments",
+        "title": "Strip Comments",
+        "category": "DIPS Calc"
       }
     ],
     "grammars": [
       {
-        "language": "excel-formula",
-        "scopeName": "source.excel-formula",
-        "path": "./syntaxes/excel-formula.tmLanguage.json"
+        "language": "dips-calc",
+        "scopeName": "source.dips-calc",
+        "path": "./syntaxes/dips-calc.tmLanguage.json"
       }
     ],
     "configurationDefaults": {
-      "[excel-formula]": {
+      "[dips-calc]": {
         "editor.tabSize": 2,
         "editor.insertSpaces": true,
         "editor.formatOnPaste": true
@@ -78,9 +81,5 @@
     }
   },
   "main": "./extension.js",
-  "activationEvents": [
-    "onLanguage:excel-formula",
-    "onCommand:excel-formula.minifyFormula",
-    "onCommand:excel-formula.beautifyFormula"
-  ]
+  "activationEvents": []
 }
