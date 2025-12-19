@@ -12,9 +12,12 @@ Give complex Excel formulas the same polish you expect from code. This Visual St
 
 ## Install
 
-1. Open the Extensions view in VS Code (`Ctrl+Shift+X` / `Cmd+Shift+X`).
-2. Search for **"DIPS Arena Calc Expression Formatter"** and click **Install**.
-3. Reload the window if prompted and you're ready to format expressions.
+1. Download or clone this repository.
+2. Copy the entire folder to your VS Code extensions directory:
+   - **Windows:** `%USERPROFILE%\.vscode\extensions\siljelb.dips-calc-expression`
+   - **macOS/Linux:** `~/.vscode/extensions/siljelb.dips-calc-expression`
+3. Restart VS Code.
+4. Open any `.calc` file to start using the extension.
 
 ## Everyday Use
 
