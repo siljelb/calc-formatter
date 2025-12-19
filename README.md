@@ -1,6 +1,6 @@
 # DIPS Arena Calc Expression Formatter
 
-Give complex Excel formulas the same polish you expect from code. This Visual Studio Code extension keeps formulas readable, helps you explore function names, and now lets you collapse everything back down when you need compact copies.
+Give complex DIPS Arena calc expressions the same polish you expect from code. This Visual Studio Code extension keeps calc expressions readable, helps you explore function names, and lets you collapse everything back down when you need compact copies.
 
 ## Why You'll Like It
 
@@ -50,7 +50,7 @@ The extension ships with sensible defaults for calc expression editing. Override
 
 ## Share Feedback
 
-Spotted a bug or want a new capability? Open an issue in the repository and include a sample formula so we can reproduce it quickly.
+Spotted a bug or want a new capability? Open an issue in the repository and include a sample calc expression so we can reproduce it quickly.
 
 ## For Developers
 
@@ -58,8 +58,8 @@ Want to tinker with the formatter logic or help the project grow? Here's how to 
 
 1. Clone the repository and install dependencies:
    ```bash
-   git clone https://github.com/<your-org>/excel-formula-formatter.git
-   cd excel-formula-formatter
+   git clone https://github.com/<your-org>/calc-formatter.git
+   cd calc-formatter
    npm install
    ```
 2. Open the folder in VS Code and press `F5` to launch the extension in a new Extension Development Host window.
@@ -68,4 +68,4 @@ Want to tinker with the formatter logic or help the project grow? Here's how to 
 
 We welcome issues, feature ideas, and pull requests—please describe the scenario and include example formulas so reviews go quickly.
 
-Enjoy cleaner Excel formulas without leaving VS Code!
+Enjoy cleaner calc expressions without leaving VS Code!
