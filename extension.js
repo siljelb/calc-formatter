@@ -15,18 +15,75 @@ function activate(context) {
     selector,
     {
       provideCompletionItems(document, position) {
+        const lineText = document.lineAt(position.line).text;
+        const linePrefix = lineText.substring(0, position.character);
+        
+        // Don't provide function completions if user already typed opening parenthesis
+        if (linePrefix.match(/[A-Za-z_][A-Za-z0-9_]*\s*\($/)) {
+          return [];
+        }
+        
         const items = FUNCTION_ITEMS.map(fn => {
           const item = new vscode.CompletionItem(fn.name, vscode.CompletionItemKind.Function);
           item.detail = fn.signature;
           item.documentation = fn.detail;
-          item.insertText = new vscode.SnippetString(`${fn.name}($0)`);
-          item.commitCharacters = ['('];
+          
+          // Check if function takes arguments by looking at signature
+          // Functions without args have "()" directly, functions with args have something inside
+          const hasArgs = !fn.signature.match(/\(\s*\)$/);
+          
+          if (hasArgs) {
+            // Place cursor inside parentheses: FUNC(|)
+            item.insertText = new vscode.SnippetString(`${fn.name}($0)`);
+          } else {
+            // Place cursor after parentheses: FUNC()|
+            item.insertText = new vscode.SnippetString(`${fn.name}()$0`);
+          }
+          
           return item;
         });
         return items;
       }
+    }
+  );
+
+  // Variable completion provider - triggers on '$'
+  const variableCompletionProvider = vscode.languages.registerCompletionItemProvider(
+    selector,
+    {
+      provideCompletionItems(document, position) {
+        const lineText = document.lineAt(position.line).text;
+        const linePrefix = lineText.substring(0, position.character);
+        
+        // Only provide completions if we're typing a variable (after $)
+        if (!linePrefix.match(/\$[A-Za-z0-9_.]*$/)) {
+          return [];
+        }
+
+        // Scan the entire document for variables
+        const text = document.getText();
+        const variableRegex = /\$[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/g;
+        const variables = new Set();
+        
+        let match;
+        while ((match = variableRegex.exec(text)) !== null) {
+          variables.add(match[0]);
+        }
+
+        // Create completion items for each unique variable
+        const items = Array.from(variables).map(varName => {
+          const item = new vscode.CompletionItem(varName, vscode.CompletionItemKind.Variable);
+          item.detail = 'Variable';
+          // Insert without the $ since user already typed it
+          item.insertText = varName.substring(1);
+          item.filterText = varName;
+          return item;
+        });
+
+        return items;
+      }
     },
-    '('
+    '$' // Trigger on $ character
   );
 
   // Full-document formatter invoked by the built-in Format Document command.
@@ -116,6 +173,7 @@ function activate(context) {
 
   context.subscriptions.push(
     completionProvider,
+    variableCompletionProvider,
     formattingProvider,
     rangeFormattingProvider,
     hoverProvider,
@@ -474,7 +532,6 @@ function tokenize(source) {
   let buffer = '';
   let inString = false;
   let stringChar = '';
-  let inBracket = false;
 
   const flushBuffer = () => {
     if (!buffer) {
@@ -488,7 +545,7 @@ function tokenize(source) {
     const ch = source[i];
 
     // Handle line comments
-    if (!inString && !inBracket && ch === '/' && source[i + 1] === '/') {
+    if (!inString && ch === '/' && source[i + 1] === '/') {
       flushBuffer();
       let comment = '//';
       i += 2;
@@ -499,24 +556,6 @@ function tokenize(source) {
       tokens.push({ type: 'comment', value: comment });
       if (i < source.length) {
         i -= 1; // Let the main loop handle the newline
-      }
-      continue;
-    }
-
-    // Handle bracket variables like [VariableName]
-    if (!inString && ch === '[') {
-      flushBuffer();
-      buffer = '[';
-      inBracket = true;
-      continue;
-    }
-
-    if (inBracket) {
-      buffer += ch;
-      if (ch === ']') {
-        tokens.push({ type: 'word', value: buffer });
-        buffer = '';
-        inBracket = false;
       }
       continue;
     }
@@ -551,7 +590,7 @@ function tokenize(source) {
     }
 
     const twoChar = source.slice(i, i + 2);
-    if (twoChar === '>=' || twoChar === '<=' || twoChar === '<>' || twoChar === '==' || twoChar === '!=' || twoChar === '&&' || twoChar === '||') {
+    if (twoChar === '>=' || twoChar === '<=' || twoChar === '<>') {
       flushBuffer();
       tokens.push({ type: 'operator', value: twoChar });
       i += 1;
@@ -564,7 +603,7 @@ function tokenize(source) {
       continue;
     }
 
-    if ('+-*/^&%=><>!?:'.includes(ch)) {
+    if ('+-*/^&%=><?:'.includes(ch)) {
       flushBuffer();
       tokens.push({ type: 'operator', value: ch });
       continue;

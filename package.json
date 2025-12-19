@@ -2,7 +2,6 @@
   "name": "dips-calc-expression",
   "displayName": "DIPS Arena Calc Expression Formatter",
   "description": "VS Code extension to format, indent, and highlight DIPS Arena calc expressions",
-  "icon": "icons/calc-icon.png",
   "version": "0.1.0",
   "publisher": "siljelb",
   "license": "Apache-2.0",
@@ -24,7 +23,7 @@
     "url": "https://github.com/siljelb/calc-formatter/issues"
   },
   "engines": {
-    "vscode": "^1.104.0"
+    "vscode": "^1.100.0"
   },
   "categories": [
     "Programming Languages",
