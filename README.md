@@ -7,6 +7,7 @@ Give complex DIPS Arena calc expressions the same polish you expect from code. T
 - **Clean formatting** – Convert dense expressions into a well-indented layout that is easy to scan.
 - **One-click minify** – Run `DIPS Calc: Minify Document or Selection` from the Command Palette when you need a single-line version.
 - **Real-time IntelliSense** – Start typing and get completions for common calc functions with signature help.
+- **Variable autocomplete** – Type `$` to see available variables from `form_description.json` in the same folder hierarchy.
 - **Syntax-aware highlighting** – Colours functions, variables, strings, booleans, and numbers so the important bits stand out.
 - **File explorer integration** – `.calc` files show a dedicated icon for quick visual recognition.
 
@@ -47,6 +48,21 @@ The extension ships with sensible defaults for calc expression editing. Override
   "editor.formatOnPaste": true
 }
 ```
+
+## Variable Autocomplete from form_description.json
+
+When editing `.calc` files, the extension automatically looks for a `form_description.json` file in the same folder or the immediate parent folder. It extracts all `calcId` annotations and provides them as variable completions when you type `$`.
+
+This means you get IntelliSense for all the field variables defined in your DIPS Arena form:
+
+1. Place your `.calc` file in the same folder as your `form_description.json`, or in a direct subfolder.
+2. Type `$` to trigger autocomplete.
+3. Variables from the form description appear first (marked as "from form_description.json").
+4. Variables already used in the current document also appear in the list.
+
+**Note:** Only the `form_description.json` in the same folder or immediate parent is used. This prevents accidentally picking up variables from unrelated forms elsewhere in your workspace.
+
+The cache is automatically refreshed when `form_description.json` changes.
 
 ## Share Feedback
 

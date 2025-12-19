@@ -31,8 +31,8 @@
     "variables": {
       "patterns": [
         {
-          "match": "\\$[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*",
-          "name": "variable.other.predicate.dips-calc"
+          "match": "\\$[A-Za-z_][A-Za-z0-9_]*(?:[./][A-Za-z_][A-Za-z0-9_]*)+",
+          "name": "variable.other.path.dips-calc"
         },
         {
           "match": "\\$[A-Za-z_][A-Za-z0-9_]*",

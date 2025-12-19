@@ -2,7 +2,7 @@
   "name": "dips-calc-expression",
   "displayName": "DIPS Arena Calc Expression Formatter",
   "description": "VS Code extension to format, indent, and highlight DIPS Arena calc expressions",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "siljelb",
   "license": "Apache-2.0",
   "keywords": [

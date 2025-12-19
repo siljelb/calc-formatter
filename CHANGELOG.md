@@ -4,6 +4,15 @@ All notable changes to the "DIPS Arena Calc Expression Formatter" extension will
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0]
+### Added
+- **form_description.json integration** - Variable autocomplete now reads `calcId` annotations from `form_description.json` files in the same folder or parent folders
+- Variables from form_description.json are shown with source information and sorted first in completions
+- File watcher automatically refreshes the cache when form_description.json changes
+
+### Changed
+- Variable completions now show source (from form_description.json vs from document)
+
 ## [0.2.0]
 ### Added
 - Variable name autocompletion - type `$` to see all variables used in the document
