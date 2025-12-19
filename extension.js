@@ -438,6 +438,32 @@ function formatSingleFormula(formula) {
   let currentLine = '';
   let lastToken = null;
 
+  // Count arguments in the upcoming parentheses group
+  const countArgs = (startIndex) => {
+    let depth = 0;
+    let argCount = 0;
+    let hasContent = false;
+    
+    for (let i = startIndex; i < tokens.length; i++) {
+      const token = tokens[i];
+      if (token.type === 'punct') {
+        if (token.value === '(' || token.value === '{') {
+          depth++;
+        } else if (token.value === ')' || token.value === '}') {
+          depth--;
+          if (depth === 0) {
+            return hasContent ? argCount + 1 : 0;
+          }
+        } else if (token.value === ',' && depth === 1) {
+          argCount++;
+        }
+      } else if (depth === 1 && (token.type === 'word' || token.type === 'string')) {
+        hasContent = true;
+      }
+    }
+    return argCount;
+  };
+
   const ensureIndent = () => {
     if (!currentLine) {
       currentLine = indentUnit.repeat(indentLevel);
@@ -460,25 +486,47 @@ function formatSingleFormula(formula) {
     currentLine = '';
   };
 
+  // Track whether current parentheses group should be multiline
+  const multilineStack = [];
+
   tokens.forEach((token, index) => {
     if (token.type === 'punct') {
       if (token.value === '(' || token.value === '{') {
+        const argCount = countArgs(index);
+        const shouldMultiline = argCount > 1;
+        multilineStack.push(shouldMultiline);
+        
         currentLine = currentLine.trimEnd();
         ensureIndent();
         currentLine += token.value;
-        closeLine();
-        indentLevel += 1;
-      } else if (token.value === ')' || token.value === '}') {
-        if (currentLine.trim().length) {
+        
+        if (shouldMultiline) {
           closeLine();
+          indentLevel += 1;
         }
-        indentLevel = Math.max(indentLevel - 1, 0);
-        currentLine = indentUnit.repeat(indentLevel) + token.value;
+      } else if (token.value === ')' || token.value === '}') {
+        const wasMultiline = multilineStack.pop();
+        
+        if (wasMultiline) {
+          if (currentLine.trim().length) {
+            closeLine();
+          }
+          indentLevel = Math.max(indentLevel - 1, 0);
+          currentLine = indentUnit.repeat(indentLevel) + token.value;
+        } else {
+          currentLine += token.value;
+        }
       } else if (token.value === ',' || token.value === ';') {
+        const isMultiline = multilineStack.length > 0 && multilineStack[multilineStack.length - 1];
         currentLine = currentLine.trimEnd();
         ensureIndent();
         currentLine += token.value;
-        closeLine();
+        
+        if (isMultiline) {
+          closeLine();
+        } else {
+          currentLine += ' ';
+        }
       } else {
         ensureIndent();
         currentLine += token.value;
