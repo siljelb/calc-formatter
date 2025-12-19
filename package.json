@@ -64,6 +64,25 @@
         "category": "DIPS Calc"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceLangId == dips-calc",
+          "command": "dips-calc.beautifyFormula",
+          "group": "1_modification"
+        },
+        {
+          "when": "resourceLangId == dips-calc",
+          "command": "dips-calc.minifyFormula",
+          "group": "1_modification"
+        },
+        {
+          "when": "resourceLangId == dips-calc",
+          "command": "dips-calc.stripComments",
+          "group": "1_modification"
+        }
+      ]
+    },
     "grammars": [
       {
         "language": "dips-calc",
