@@ -1087,6 +1087,12 @@ function activate(context) {
       return { type: null, confidence: 'low' };
     }
     
+    // Comparison operators return boolean - check BEFORE function calls
+    // so expressions like "MAX(...) > 305" are correctly typed as boolean
+    if (/[<>=!]|<>|>=|<=|==|!=/.test(trimmed)) {
+      return { type: 'boolean', confidence: 'medium' };
+    }
+    
     // Function call - infer from function's return type
     const funcMatch = trimmed.match(/^([A-Z][A-Z0-9_]*)\s*\(/i);
     if (funcMatch) {
@@ -1095,11 +1101,6 @@ function activate(context) {
       if (funcInfo?.returns) {
         return { type: funcInfo.returns, confidence: 'high' };
       }
-    }
-    
-    // Comparison operators return boolean
-    if (/[<>=]|<>|>=|<=/.test(trimmed)) {
-      return { type: 'boolean', confidence: 'medium' };
     }
     
     // Arithmetic expression (contains +, -, *, /, ^) - likely number
