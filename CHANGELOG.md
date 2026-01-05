@@ -5,6 +5,10 @@ All notable changes to the "DIPS Arena Calc Expression Formatter" extension will
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.3.1]
+### Fixed
+- Type inference for comparison expressions - expressions like `MAX(...) > 305` are now correctly identified as boolean instead of number
+
 ## [0.3.0]
 ### Added
 - **form_description.json integration** - Variable autocomplete now reads `calcId` annotations from `form_description.json` files in the same folder or parent folders
