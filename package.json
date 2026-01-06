@@ -62,6 +62,16 @@
         "command": "dips-calc.stripComments",
         "title": "Strip Comments",
         "category": "DIPS Calc"
+      },
+      {
+        "command": "dips-calc.expandCustomFunctions",
+        "title": "Expand Custom Functions",
+        "category": "DIPS Calc"
+      },
+      {
+        "command": "dips-calc.exportForArena",
+        "title": "Export for DIPS Arena (Expand + Strip)",
+        "category": "DIPS Calc"
       }
     ],
     "menus": {
@@ -80,6 +90,16 @@
           "when": "resourceLangId == dips-calc",
           "command": "dips-calc.stripComments",
           "group": "1_modification"
+        },
+        {
+          "when": "resourceLangId == dips-calc",
+          "command": "dips-calc.expandCustomFunctions",
+          "group": "2_custom"
+        },
+        {
+          "when": "resourceLangId == dips-calc",
+          "command": "dips-calc.exportForArena",
+          "group": "2_custom"
         }
       ]
     },

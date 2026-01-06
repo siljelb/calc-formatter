@@ -4,8 +4,16 @@ const path = require('path');
 
 // Function metadata lives in a separate module for easier maintenance.
 const FUNCTION_ITEMS = require('./function-items');
+
+// Import custom functions
+const { CUSTOM_FUNCTIONS } = require('./lib/custom-functions/index');
+
+// Merge standard and custom functions for completion and validation
+const ALL_FUNCTION_ITEMS = [...FUNCTION_ITEMS, ...CUSTOM_FUNCTIONS];
+
+// Create lookup map including both standard and custom functions
 const FUNCTION_LOOKUP = new Map(
-  FUNCTION_ITEMS.map(item => [item.name.toUpperCase(), item])
+  ALL_FUNCTION_ITEMS.map(item => [item.name.toUpperCase(), item])
 );
 
 // Import modular components
@@ -33,9 +41,13 @@ const {
   detectMissingCommas 
 } = require('./lib/validation');
 
-const { 
+const {
   createHoverProvider 
 } = require('./lib/hover-provider');
+
+const {
+  createSignatureHelpProvider
+} = require('./lib/signature-provider');
 
 const {
   formatFormula,
@@ -69,7 +81,7 @@ function activate(context) {
   const completionProviders = createCompletionProviders(
     vscode,
     selector,
-    FUNCTION_ITEMS,
+    ALL_FUNCTION_ITEMS,
     findFormDescriptionJson,
     getVariablesFromFormDescription
   );
@@ -120,6 +132,12 @@ function activate(context) {
     createHoverProvider(vscode, FUNCTION_LOOKUP, findFormDescriptionJson, getVariablesFromFormDescription)
   );
 
+  const signatureHelpProvider = vscode.languages.registerSignatureHelpProvider(
+    selector,
+    createSignatureHelpProvider(vscode, FUNCTION_LOOKUP),
+    '(', ','
+  );
+
   // Watch for changes to form_description.json files to invalidate cache
   const formDescWatcher = vscode.workspace.createFileSystemWatcher('**/form_description.json');
   formDescWatcher.onDidChange(uri => {
@@ -151,6 +169,7 @@ function activate(context) {
     formattingProvider,
     rangeFormattingProvider,
     hoverProvider,
+    signatureHelpProvider,
     formDescWatcher,
     diagnostics.diagnosticCollection,
     diagnostics.codeActionProvider

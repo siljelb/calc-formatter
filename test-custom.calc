@@ -1,0 +1,2 @@
+// Test custom function expansion
+BMI(70, 175)
