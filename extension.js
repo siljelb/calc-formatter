@@ -808,36 +808,100 @@ function activate(context) {
 
       // If it's a variable, try to show variable info
       if (isVariable) {
-        const variableName = document.getText(wordRange);
         const formDescPath = findFormDescriptionJson(document.uri.fsPath);
         
         if (formDescPath) {
           const variables = getVariablesFromFormDescription(formDescPath);
-          const varInfo = variables.get(variableName);
           
-          if (varInfo) {
-            const markdown = new vscode.MarkdownString();
-            markdown.appendMarkdown(`**${varInfo.name}**\n\n`);
+          // Get the full variable path including any suffixes
+          // Look backwards from the $ to get the base variable name
+          // Then look forwards to get any path suffixes like /value
+          const line = document.lineAt(position.line).text;
+          const dollarIndex = line.lastIndexOf('$', position.character);
+          
+          if (dollarIndex !== -1) {
+            // Extract the full path: $varName/path/suffix
+            const pathMatch = line.substring(dollarIndex).match(/^\$([A-Za-z_][A-Za-z0-9_.]*)([\/A-Za-z_][A-Za-z0-9_./]*)?/);
             
-            if (varInfo.rmType) {
-              markdown.appendMarkdown(`*Type:* \`${varInfo.rmType}\`\n\n`);
-            }
-            
-            markdown.appendMarkdown(`*Variable:* \`$${varInfo.calcId}\`\n\n`);
-            
-            if (varInfo.values && varInfo.values.length > 0) {
-              markdown.appendMarkdown('**Allowed values:**\n\n');
-              const maxDisplay = 10;
-              const displayValues = varInfo.values.slice(0, maxDisplay);
-              for (const val of displayValues) {
-                markdown.appendMarkdown(`- \`${val.value}\` — ${val.label}\n`);
+            if (pathMatch) {
+              const baseVarName = pathMatch[1];
+              const pathSuffix = pathMatch[2] || '';
+              const fullPath = '$' + baseVarName + pathSuffix;
+              
+              const varInfo = variables.get(baseVarName);
+              
+              if (varInfo) {
+                const markdown = new vscode.MarkdownString();
+                markdown.appendMarkdown(`**${varInfo.name}**\n\n`);
+                
+                // Determine the actual type based on rmType and path suffix
+                let displayType = varInfo.rmType;
+                let typeDescription = null;
+                
+                if (pathSuffix === '/value') {
+                  // The /value path returns the actual value type
+                  const valueTypeMapping = {
+                    'DV_DATE_TIME': 'ISO8601 datetime string',
+                    'DV_DATE': 'ISO8601 date string',
+                    'DV_TIME': 'ISO8601 time string',
+                    'DV_DURATION': 'ISO8601 duration string',
+                    'DV_QUANTITY': 'number',
+                    'DV_COUNT': 'integer',
+                    'DV_PROPORTION': 'number',
+                    'DV_ORDINAL': 'integer',
+                    'DV_BOOLEAN': 'boolean',
+                    'DV_TEXT': 'text',
+                    'DV_CODED_TEXT': 'text',
+                    'DV_IDENTIFIER': 'text',
+                    'DV_URI': 'text'
+                  };
+                  displayType = valueTypeMapping[varInfo.rmType] || varInfo.rmType;
+                  typeDescription = 'value';
+                } else if (pathSuffix === '/magnitude') {
+                  displayType = 'number';
+                  typeDescription = 'magnitude';
+                } else if (pathSuffix === '/units') {
+                  displayType = 'text';
+                  typeDescription = 'units';
+                } else if (pathSuffix === '/numerator') {
+                  displayType = 'number';
+                  typeDescription = 'numerator';
+                } else if (pathSuffix === '/denominator') {
+                  displayType = 'number';
+                  typeDescription = 'denominator';
+                } else if (pathSuffix === '/symbol') {
+                  displayType = 'integer';
+                  typeDescription = 'symbol (ordinal value)';
+                } else if (pathSuffix.startsWith('/defining_code')) {
+                  displayType = 'code';
+                  typeDescription = 'terminology code';
+                }
+                
+                if (varInfo.rmType) {
+                  if (typeDescription) {
+                    markdown.appendMarkdown(`*Type:* \`${displayType}\` (${typeDescription} of \`${varInfo.rmType}\`)\n\n`);
+                  } else {
+                    markdown.appendMarkdown(`*Type:* \`${displayType}\`\n\n`);
+                  }
+                }
+                
+                markdown.appendMarkdown(`*Variable:* \`${fullPath}\`\n\n`);
+                
+                if (varInfo.values && varInfo.values.length > 0) {
+                  markdown.appendMarkdown('**Allowed values:**\n\n');
+                  const maxDisplay = 10;
+                  const displayValues = varInfo.values.slice(0, maxDisplay);
+                  for (const val of displayValues) {
+                    markdown.appendMarkdown(`- \`${val.value}\` — ${val.label}\n`);
+                  }
+                  if (varInfo.values.length > maxDisplay) {
+                    markdown.appendMarkdown(`\n*...and ${varInfo.values.length - maxDisplay} more*\n`);
+                  }
+                }
+                
+                return new vscode.Hover(markdown, varRange);
               }
-              if (varInfo.values.length > maxDisplay) {
-                markdown.appendMarkdown(`\n*...and ${varInfo.values.length - maxDisplay} more*\n`);
-              }
             }
-            
-            return new vscode.Hover(markdown, varRange);
           }
         }
         
