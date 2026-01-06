@@ -5,6 +5,33 @@ All notable changes to the "DIPS Arena Calc Expression Formatter" extension will
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.4.0] - 2026-01-06
+### Added
+- **Custom functions system** - Define reusable macro-style functions that expand to complex expressions
+  - Auto-discovery: Add new functions by creating files in `lib/custom-functions/` directory
+  - Built-in custom functions:
+    - `BMI(weight_kg, height_cm)` - Calculate Body Mass Index
+    - `FORMAT_DURATION(duration_string, format_string)` - Format ISO8601 durations with Norwegian localization (supports .NET TimeSpan formats)
+    - `TEXTJOIN(delimiter, ignore_empty, text1, ..., text10)` - Excel-style text joining with optional empty value handling
+  - Commands: `Expand Custom Functions` and `Export for Arena` to compile custom functions into standard DIPS Calc
+- **Signature help** - Parameter hints appear automatically while typing function arguments
+  - Shows function signature, parameter names, and types
+  - Highlights current parameter position
+  - Automatically triggered when selecting functions from autocomplete
+  - Manual trigger: `Ctrl+Shift+Space` / `Cmd+Shift+Space`
+- Centralized constants in `lib/constants.js` for configuration values
+
+### Changed
+- **Improved type inference** - String comparison expressions now correctly infer as boolean type
+  - Top-level comparisons (e.g., `"c" = "g"`) return boolean
+  - Comparisons inside function calls respect the function's return type (e.g., `IF(x > 0, "yes", "no")` returns text)
+  - Proper handling of parenthesis depth and string literals in type checking
+
+### Fixed
+- Diagnostics provider missing import for `DIAGNOSTIC_CODES` and `DIAGNOSTIC_SOURCE`
+- String literal detection now counts quotes to avoid false positives with comparison operators
+- FORMAT_DURATION replaced MOD() function with arithmetic operations (MOD not supported in DIPS Calc)
+
 ## [0.3.1]
 ### Fixed
 - Type inference for comparison expressions - expressions like `MAX(...) > 305` are now correctly identified as boolean instead of number

@@ -1,19 +1,21 @@
 # DIPS Arena Calc Expression Formatter
 
-Give complex DIPS Arena calc expressions the same polish you expect from code. This Visual Studio Code extension keeps calc expressions readable, helps you explore function names, and lets you collapse everything back down when you need compact copies.
+A Visual Studio Code extension for formatting, validating, and working with DIPS Arena calc expressions.
 
-## Why You'll Like It
+## Features
 
-- **Clean formatting** – Convert dense expressions into a well-indented layout that is easy to scan.
-- **One-click minify** – Run `DIPS Calc: Minify Document or Selection` from the Command Palette when you need a single-line version.
-- **Real-time IntelliSense** – Start typing and get completions for common calc functions with signature help.
-- **Smart function wrapping** – Type a function name before an expression (like `ISNULL` before `$myVar`) and it wraps automatically.
-- **Variable autocomplete** – Type `$` to see available variables from `form_description.json` with their data types.
-- **Path autocomplete** – Type `/` after a variable to get path suggestions (e.g., `$quantity/magnitude`).
-- **Value autocomplete** – Type `"` after `$variable =` to see allowed values for coded text fields.
-- **Live diagnostics** – Get warnings for incorrect argument counts, type mismatches, and missing commas.
-- **Syntax-aware highlighting** – Colours functions, variables, strings, booleans, and numbers so the important bits stand out.
-- **File explorer integration** – `.calc` files show a dedicated icon for quick visual recognition.
+- **Clean formatting** – Convert dense expressions into indented, readable layouts.
+- **One-click minify** – Collapse formatted expressions back to single-line format.
+- **IntelliSense** – Autocomplete for calc functions with signature help.
+- **Parameter hints** – Function signatures and parameter types displayed while typing.
+- **Custom functions** – Define reusable macro-style functions (BMI, FORMAT_DURATION, TEXTJOIN) that expand to standard calc expressions.
+- **Function wrapping** – Type a function name before an expression to automatically wrap it.
+- **Variable autocomplete** – Variables from `form_description.json` with data types.
+- **Path autocomplete** – Path suggestions for complex types (e.g., `$quantity/magnitude`).
+- **Value autocomplete** – Allowed values for coded text fields.
+- **Diagnostics** – Real-time validation for argument counts, type mismatches, and missing commas.
+- **Syntax highlighting** – Color-coded functions, variables, strings, and numbers.
+- **File icons** – Dedicated icon for `.calc` files in the explorer.
 
 ## Install
 
@@ -24,14 +26,14 @@ Give complex DIPS Arena calc expressions the same polish you expect from code. T
 3. Restart VS Code.
 4. Open any `.calc` file to start using the extension.
 
-## Everyday Use
+## Usage
 
-1. Save or open a file with the `.calc` extension (or pick **DIPS Calc Expression** in the language mode picker).
-2. Paste or type your expression. Run **Format Document** (`Shift+Alt+F`) to beautify it.
-3. Add comments using `//` to document your expressions - these are for your reference in the editor only.
-4. Need the compact version? Press `Ctrl+Shift+P` / `Cmd+Shift+P`, run **DIPS Calc: Minify Document or Selection**, and copy the result.
-5. Before copying to DIPS Arena, run **DIPS Calc: Strip Comments** to remove all comments (DIPS Arena does not support comments natively).
-6. Trigger completions with `Ctrl+Space` to browse function snippets.
+1. Open or create a file with the `.calc` extension (or select **DIPS Calc Expression** from the language mode picker).
+2. Type or paste your expression. Use **Format Document** (`Shift+Alt+F`) to format.
+3. Add comments using `//` for documentation (editor-only, not supported in DIPS Arena).
+4. To get a compact version, run **DIPS Calc: Minify Document or Selection** from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
+5. Before pasting to DIPS Arena, run **DIPS Calc: Export for Arena** to strip comments and expand custom functions.
+6. Use `Ctrl+Space` to trigger function and variable completions.
 
 ## Commands
 
@@ -40,6 +42,62 @@ Give complex DIPS Arena calc expressions the same polish you expect from code. T
 | `DIPS Calc: Minify Document or Selection` | Collapse the active selection or entire file into a single-line expression while preserving strings and operators. |
 | `DIPS Calc: Beautify Document or Selection` | Manually beautify the selection or the entire file. |
 | `DIPS Calc: Strip Comments` | Remove all `//` comments from the document or selection. Use this before copying expressions to DIPS Arena, which does not support comments natively. |
+| `DIPS Calc: Expand Custom Functions` | Expand all custom function calls (like BMI, FORMAT_DURATION) into standard DIPS Calc expressions. |
+| `DIPS Calc: Export for Arena` | One-click export: strip comments and expand custom functions for pasting into DIPS Arena. |
+
+## Custom Functions
+
+Custom functions are macro-style functions that expand to standard DIPS Calc expressions. Use cases:
+- Reusing calculations across forms
+- Simplifying complex expressions
+- Creating domain-specific functions
+
+### Built-in Custom Functions
+
+- **`BMI(weight_kg, height_cm)`** – Calculate Body Mass Index
+- **`FORMAT_DURATION(duration_string, format_string)`** – Format ISO8601 durations with Norwegian localization
+  - Standard formats: `"c"`, `"g"`, `"G"`
+  - Norwegian formats: `"no-short"`, `"no-long"`, `"no-compact"`
+  - Custom formats using: `d` (days), `h` (hours), `m` (minutes), `s` (seconds)
+- **`TEXTJOIN(delimiter, ignore_empty, text1, ..., text10)`** – Excel-style text joining
+
+### Using Custom Functions
+
+1. Type custom function names in your expressions (autocomplete available).
+2. Run **DIPS Calc: Export for Arena** or **DIPS Calc: Expand Custom Functions** to convert to standard DIPS Calc.
+3. Copy the expanded result to DIPS Arena.
+
+### Creating Custom Functions
+
+Add a new file to `lib/custom-functions/` with this structure:
+
+```javascript
+module.exports = {
+  name: 'MY_FUNCTION',
+  signature: 'MY_FUNCTION(param1, param2)',
+  detail: 'Description of what the function does',
+  minArgs: 2,
+  maxArgs: 2,
+  returns: 'number',
+  params: [
+    { name: 'param1', type: 'number' },
+    { name: 'param2', type: 'text' }
+  ],
+  expansion: 'ROUND({param1} * 10 + LEN({param2}), 2)'
+};
+```
+
+The function will be automatically loaded – no registration required.
+
+## Parameter Hints (Signature Help)
+
+Function signatures display parameter names, types, and the current parameter position while typing.
+
+Triggers:
+- Type `(` after a function name
+- Type `,` to move to next parameter
+- Select a function from autocomplete
+- Manual: `Ctrl+Shift+Space` / `Cmd+Shift+Space`
 
 ## Configuration
 
@@ -55,66 +113,63 @@ The extension ships with sensible defaults for calc expression editing. Override
 
 ## Variable Autocomplete from form_description.json
 
-When editing `.calc` files, the extension automatically looks for a `form_description.json` file in the same folder or the immediate parent folder. It extracts all `calcId` annotations and provides them as variable completions when you type `$`.
+The extension searches for `form_description.json` in the same folder or immediate parent folder and extracts `calcId` annotations for variable completions.
 
-This means you get IntelliSense for all the field variables defined in your DIPS Arena form:
-
-1. Place your `.calc` file in the same folder as your `form_description.json`, or in a direct subfolder.
+Usage:
+1. Place `.calc` file in the same folder as `form_description.json` or in a direct subfolder.
 2. Type `$` to trigger autocomplete.
-3. Variables from the form description appear first, showing their name and data type.
-4. Variables already used in the current document also appear in the list.
+3. Variables from form description appear first with name and data type.
+4. Variables used in the current document also appear.
 
 ### Path Completion
 
-After typing a variable name, type `/` to get path suggestions based on the variable's data type:
+Type `/` after a variable name to get path suggestions based on data type:
 
-- `$quantity/magnitude` – Get the numeric value of a DV_QUANTITY
-- `$quantity/units` – Get the unit string
-- `$coded/defining_code/code_string` – Get the code value of a DV_CODED_TEXT
-- `$ordinal/value` – Get the integer value of a DV_ORDINAL
+- `$quantity/magnitude` – Numeric value of DV_QUANTITY
+- `$quantity/units` – Unit string
+- `$coded/defining_code/code_string` – Code value of DV_CODED_TEXT
+- `$ordinal/value` – Integer value of DV_ORDINAL
 
 ### Value Completion
 
-For DV_CODED_TEXT and DV_ORDINAL fields that have defined values, type `"` after an equals sign to see allowed values:
+For DV_CODED_TEXT and DV_ORDINAL fields with defined values, type `"` after an equals sign to see allowed values:
 
 ```
 $status = "  <-- triggers value completion
 ```
 
-**Note:** Only the `form_description.json` in the same folder or immediate parent is used. This prevents accidentally picking up variables from unrelated forms elsewhere in your workspace.
+**Note:** Only `form_description.json` in the same folder or immediate parent is used to avoid conflicts with unrelated forms.
 
-The cache is automatically refreshed when `form_description.json` changes.
+Cache refreshes automatically when `form_description.json` changes.
 
 ## Diagnostics
 
-The extension provides real-time feedback as you type:
+Real-time validation:
 
-- **Argument count validation** – Errors when a function receives too few or too many arguments
-- **Type checking** – Warnings when argument types don't match (e.g., passing text where a number is expected)
-- **Missing comma detection** – Warnings when arguments appear to be missing a comma, with a quick fix (lightbulb) to insert it
-- **Unknown function warnings** – Highlights function names that aren't recognized
-- **ISNULL/GENERIC_FIELD validation** – Error when using `ISNULL()` with a GENERIC_FIELD variable, suggesting `ISBLANK()` instead
+- **Argument count** – Errors for incorrect number of arguments
+- **Type checking** – Warnings for type mismatches
+- **Missing commas** – Warnings with quick fix to insert comma
+- **Unknown functions** – Highlights unrecognized function names
+- **ISNULL/GENERIC_FIELD** – Error suggesting `ISBLANK()` instead
 
-Click the lightbulb or press `Ctrl+.` to see available quick fixes.
+Use `Ctrl+.` or click the lightbulb for quick fixes.
 
-## Share Feedback
+## Feedback
 
-Spotted a bug or want a new capability? Open an issue in the repository and include a sample calc expression so we can reproduce it quickly.
+Report bugs or request features in the GitHub repository. Include sample expressions for faster reproduction.
 
-## For Developers
+## Development
 
-Want to tinker with the formatter logic or help the project grow? Here's how to get started:
+Setup:
 
-1. Clone the repository and install dependencies:
-   ```bash
-   git clone https://github.com/<your-org>/calc-formatter.git
-   cd calc-formatter
-   npm install
-   ```
-2. Open the folder in VS Code and press `F5` to launch the extension in a new Extension Development Host window.
-3. Run sanity checks with `node run-format-tests.js`. Add new samples under `test/` before submitting a PR.
-4. Package a distributable build via `npx vsce package`.
+```bash
+git clone https://github.com/<your-org>/calc-formatter.git
+cd calc-formatter
+npm install
+```
 
-We welcome issues, feature ideas, and pull requests—please describe the scenario and include example formulas so reviews go quickly.
+- Press `F5` in VS Code to launch Extension Development Host
+- Run tests: `node run-format-tests.js`
+- Package: `npx vsce package`
 
-Enjoy cleaner calc expressions without leaving VS Code!
+Pull requests welcome. Include test cases and example expressions.
