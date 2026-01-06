@@ -787,18 +787,65 @@ function activate(context) {
       }
 
       // Check if this word is part of a variable path (preceded by $ or /)
-      // If so, don't show function hover
       const startPos = wordRange.start;
+      let isVariable = false;
+      let varRange = wordRange;
+      
       if (startPos.character > 0) {
         const charBefore = document.getText(new vscode.Range(
           new vscode.Position(startPos.line, startPos.character - 1),
           startPos
         ));
         if (charBefore === '$' || charBefore === '/') {
-          return null;
+          isVariable = true;
+          // Extend range to include the $ or /
+          varRange = new vscode.Range(
+            new vscode.Position(startPos.line, startPos.character - 1),
+            wordRange.end
+          );
         }
       }
 
+      // If it's a variable, try to show variable info
+      if (isVariable) {
+        const variableName = document.getText(wordRange);
+        const formDescPath = findFormDescriptionJson(document.uri.fsPath);
+        
+        if (formDescPath) {
+          const variables = getVariablesFromFormDescription(formDescPath);
+          const varInfo = variables.get(variableName);
+          
+          if (varInfo) {
+            const markdown = new vscode.MarkdownString();
+            markdown.appendMarkdown(`**${varInfo.name}**\n\n`);
+            
+            if (varInfo.rmType) {
+              markdown.appendMarkdown(`*Type:* \`${varInfo.rmType}\`\n\n`);
+            }
+            
+            markdown.appendMarkdown(`*Variable:* \`$${varInfo.calcId}\`\n\n`);
+            
+            if (varInfo.values && varInfo.values.length > 0) {
+              markdown.appendMarkdown('**Allowed values:**\n\n');
+              const maxDisplay = 10;
+              const displayValues = varInfo.values.slice(0, maxDisplay);
+              for (const val of displayValues) {
+                markdown.appendMarkdown(`- \`${val.value}\` — ${val.label}\n`);
+              }
+              if (varInfo.values.length > maxDisplay) {
+                markdown.appendMarkdown(`\n*...and ${varInfo.values.length - maxDisplay} more*\n`);
+              }
+            }
+            
+            return new vscode.Hover(markdown, varRange);
+          }
+        }
+        
+        // If no variable info found, return null so no hover is shown
+        return null;
+      }
+
+      // Not a variable, check if it's a function
       const functionName = document.getText(wordRange).toUpperCase();
       const metadata = FUNCTION_LOOKUP.get(functionName);
       if (!metadata) {
@@ -864,6 +911,109 @@ function activate(context) {
 
   // Diagnostics collection for function parameter validation
   const diagnosticCollection = vscode.languages.createDiagnosticCollection('dips-calc');
+  
+  /**
+   * Validate ISO8601 date, datetime, time, or duration string.
+   * @param {string} str - The string to validate (with quotes)
+   * @returns {{valid: boolean, type: string|null, message: string|null}}
+   */
+  function validateISO8601String(str) {
+    const trimmed = str.trim();
+    if (!trimmed.startsWith('"') && !trimmed.startsWith("'")) {
+      return { valid: true, type: null, message: null };
+    }
+    
+    const content = trimmed.slice(1, -1);
+    
+    // ISO8601 datetime: YYYY-MM-DDTHH:MM:SS[.mmm][±HH:MM|Z]
+    const datetimePattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})?$/;
+    const datetimeMatch = content.match(datetimePattern);
+    if (datetimeMatch) {
+      const [, year, month, day, hour, minute, second] = datetimeMatch;
+      const y = parseInt(year), m = parseInt(month), d = parseInt(day);
+      const h = parseInt(hour), min = parseInt(minute), s = parseInt(second);
+      
+      if (m < 1 || m > 12) {
+        return { valid: false, type: 'iso8601_datetime', message: `Invalid month: ${m} (must be 01-12)` };
+      }
+      if (d < 1 || d > 31) {
+        return { valid: false, type: 'iso8601_datetime', message: `Invalid day: ${d} (must be 01-31)` };
+      }
+      if (h > 23) {
+        return { valid: false, type: 'iso8601_datetime', message: `Invalid hour: ${h} (must be 00-23)` };
+      }
+      if (min > 59) {
+        return { valid: false, type: 'iso8601_datetime', message: `Invalid minute: ${min} (must be 00-59)` };
+      }
+      if (s > 59) {
+        return { valid: false, type: 'iso8601_datetime', message: `Invalid second: ${s} (must be 00-59)` };
+      }
+      return { valid: true, type: 'iso8601_datetime', message: null };
+    }
+    
+    // ISO8601 date: YYYY-MM-DD
+    const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const dateMatch = content.match(datePattern);
+    if (dateMatch) {
+      const [, year, month, day] = dateMatch;
+      const y = parseInt(year), m = parseInt(month), d = parseInt(day);
+      
+      if (m < 1 || m > 12) {
+        return { valid: false, type: 'iso8601_date', message: `Invalid month: ${m} (must be 01-12)` };
+      }
+      if (d < 1 || d > 31) {
+        return { valid: false, type: 'iso8601_date', message: `Invalid day: ${d} (must be 01-31)` };
+      }
+      return { valid: true, type: 'iso8601_date', message: null };
+    }
+    
+    // ISO8601 time: HH:MM:SS[.mmm][±HH:MM|Z]
+    const timePattern = /^(\d{2}):(\d{2}):(\d{2})(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})?$/;
+    const timeMatch = content.match(timePattern);
+    if (timeMatch) {
+      const [, hour, minute, second] = timeMatch;
+      const h = parseInt(hour), min = parseInt(minute), s = parseInt(second);
+      
+      if (h > 23) {
+        return { valid: false, type: 'iso8601_time', message: `Invalid hour: ${h} (must be 00-23)` };
+      }
+      if (min > 59) {
+        return { valid: false, type: 'iso8601_time', message: `Invalid minute: ${min} (must be 00-59)` };
+      }
+      if (s > 59) {
+        return { valid: false, type: 'iso8601_time', message: `Invalid second: ${s} (must be 00-59)` };
+      }
+      return { valid: true, type: 'iso8601_time', message: null };
+    }
+    
+    // ISO8601 duration: P[nY][nM][nD][T[nH][nM][nS]]
+    const durationPattern = /^P(?:(\d+(?:\.\d+)?Y)?(\d+(?:\.\d+)?M)?(\d+(?:\.\d+)?W)?(\d+(?:\.\d+)?D)?)?(?:T(?:(\d+(?:\.\d+)?H)?(\d+(?:\.\d+)?M)?(\d+(?:\.\d+)?S)?)?)?$/;
+    const durationMatch = content.match(durationPattern);
+    if (durationMatch && content.startsWith('P')) {
+      // Check that at least one component exists
+      const hasComponents = durationMatch.slice(1).some(component => component !== undefined);
+      if (!hasComponents) {
+        return { valid: false, type: 'iso8601_duration', message: 'Duration must have at least one time component (e.g., P1D, PT1H)' };
+      }
+      return { valid: true, type: 'iso8601_duration', message: null };
+    }
+    
+    // Check if it looks like an attempted ISO8601 format
+    // Date/datetime patterns
+    if (/\d{4}-\d{2}/.test(content)) {
+      return { valid: false, type: 'unknown', message: 'Invalid ISO 8601 date/datetime format' };
+    }
+    // Time patterns
+    if (/\d{2}:\d{2}/.test(content)) {
+      return { valid: false, type: 'unknown', message: 'Invalid ISO 8601 time format' };
+    }
+    // Duration patterns - check for P followed by duration components
+    if (content.startsWith('P') || /P\d+[YMWDTHS]/.test(content)) {
+      return { valid: false, type: 'unknown', message: 'Invalid ISO 8601 duration format' };
+    }
+    
+    return { valid: true, type: null, message: null };
+  }
   
   /**
    * Count function arguments, handling nested parentheses and strings correctly.
@@ -1318,17 +1468,38 @@ function activate(context) {
           // Infer type of the provided argument
           const inferredType = inferExpressionType(arg.text, variables);
           
+          // Calculate argument position (needed for both type checking and ISO8601 validation)
+          const argStartInDoc = openParenIndex + 1 + argsString.indexOf(arg.text);
+          const argEndInDoc = argStartInDoc + arg.text.length;
+          const argStartPos = document.positionAt(argStartInDoc);
+          const argEndPos = document.positionAt(argEndInDoc);
+          const argRange = new vscode.Range(argStartPos, argEndPos);
+          
+          // Special validation: if parameter expects ISO8601 type and argument is a string literal, validate it
+          const iso8601Types = ['iso8601_datetime', 'iso8601_date', 'iso8601_time', 'iso8601_duration'];
+          if (iso8601Types.includes(expectedParam.type)) {
+            const trimmedArg = arg.text.trim();
+            if ((trimmedArg.startsWith('"') && trimmedArg.endsWith('"')) || 
+                (trimmedArg.startsWith("'") && trimmedArg.endsWith("'"))) {
+              const validation = validateISO8601String(trimmedArg);
+              if (!validation.valid) {
+                const isoDiagnostic = new vscode.Diagnostic(
+                  argRange,
+                  validation.message,
+                  vscode.DiagnosticSeverity.Error
+                );
+                isoDiagnostic.source = 'dips-calc';
+                isoDiagnostic.code = 'invalid-iso8601';
+                diagnostics.push(isoDiagnostic);
+                // Skip type checking if ISO8601 validation failed
+                continue;
+              }
+            }
+          }
+          
           // Only report type errors for high confidence inferences
           if (inferredType.type && inferredType.confidence === 'high') {
             if (!isTypeCompatible(inferredType.type, expectedParam.type)) {
-              // Calculate the position of this specific argument
-              const argStartInDoc = openParenIndex + 1 + argsString.indexOf(arg.text);
-              const argEndInDoc = argStartInDoc + arg.text.length;
-              
-              const argStartPos = document.positionAt(argStartInDoc);
-              const argEndPos = document.positionAt(argEndInDoc);
-              const argRange = new vscode.Range(argStartPos, argEndPos);
-              
               const typeMessage = `Argument ${i + 1} (${expectedParam.name}): expected ${formatTypeName(expectedParam.type)}, but got ${formatTypeName(inferredType.type)}`;
               
               const typeDiagnostic = new vscode.Diagnostic(
@@ -1368,7 +1539,7 @@ function activate(context) {
     
     const diagnostics = validateFunctionCalls(document, variables);
     
-    // Also add diagnostics for missing commas
+    // Add diagnostics for missing commas
     const missingCommas = detectMissingCommas(document);
     for (const mc of missingCommas) {
       const diagnostic = new vscode.Diagnostic(
