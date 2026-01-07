@@ -3,3 +3,5 @@ node_modules
 .env
 /test
 *.code-workspace
+.vscode/*
+.vscode/launch.json
