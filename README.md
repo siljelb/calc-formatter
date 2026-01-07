@@ -13,7 +13,12 @@ A Visual Studio Code extension for formatting, validating, and working with DIPS
 - **Variable autocomplete** – Variables from `form_description.json` with data types.
 - **Path autocomplete** – Path suggestions for complex types (e.g., `$quantity/magnitude`).
 - **Value autocomplete** – Allowed values for coded text fields.
-- **Diagnostics** – Real-time validation for argument counts, type mismatches, and missing commas.
+- **Diagnostics** – Real-time validation for:
+  - Argument counts and type mismatches with detailed error messages
+  - Missing commas between arguments
+  - Variables used without `$` prefix (with quick fix)
+  - Undeclared variables not found in form_description.json
+  - Enhanced type errors showing rmType and conversion suggestions
 - **Syntax highlighting** – Color-coded functions, variables, strings, and numbers.
 - **File icons** – Dedicated icon for `.calc` files in the explorer.
 

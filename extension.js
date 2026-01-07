@@ -38,7 +38,9 @@ const {
 const { 
   validateISO8601String,
   validateFunctionCalls, 
-  detectMissingCommas 
+  detectMissingCommas,
+  detectMissingDollarSign,
+  detectUndeclaredVariables
 } = require('./lib/validation');
 
 const {
@@ -94,7 +96,9 @@ function activate(context) {
     findFormDescriptionJson,
     getVariablesFromFormDescription,
     validateFunctionCalls,
-    detectMissingCommas
+    detectMissingCommas,
+    detectMissingDollarSign,
+    detectUndeclaredVariables
   );
 
   // Full-document formatter invoked by the built-in Format Document command.

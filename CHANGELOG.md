@@ -5,6 +5,36 @@ All notable changes to the "DIPS Arena Calc Expression Formatter" extension will
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.4.3] - 2026-01-07
+### Added
+- **Missing dollar sign detection** - Variables used without the `$` prefix are now flagged as errors
+  - Automatically detects known variable names from form_description.json used without `$`
+  - Quick fix available to add the `$` prefix
+  - Skips identifiers inside string literals to avoid false positives
+- **Undeclared variable warnings** - Variables with `$` prefix that aren't declared in form_description.json are now highlighted as warnings
+  - Helps catch typos in variable names
+  - Only shows warnings when form_description.json is available
+
+### Changed
+- **Enhanced type mismatch diagnostics** - Type errors now include:
+  - The variable's rmType (e.g., DV_TEXT, DV_QUANTITY)
+  - Conversion suggestions (e.g., "Use VALUE($var) to convert to number")
+- **Improved DV_QUANTITY hover tooltips** - Now displays:
+  - Allowed units with their numeric range constraints (e.g., `L/min (>= 0.0)`)
+  - Range operators and values extracted from form_description.json validation data
+  - Previously showed units as "allowed values" which was misleading
+
+### Fixed
+- **Type inference for comparison expressions** - Fixed issue where expressions like `$var = "value"` were incorrectly typed as text instead of boolean
+  - Moved comparison operator check before variable type check
+  - Variable references now only match complete variable paths (not partial prefixes)
+  - Ensures IF() function arguments are correctly validated as boolean
+- **Diagnostic range narrowing** - Type mismatch diagnostics now correctly highlight:
+  - Full variable path accessors (e.g., `$var/defining_code/code_string`) instead of just base variable name
+  - Entire expression when operators are present (e.g., `$var/7` instead of just `$var`)
+  - Only narrows to variable when expression is purely a variable reference
+
+
 ## [0.4.2] - 2026-01-07
 ### Fixed
 - **Improved type checking for ISO8601 date/datetime compatibility** - Functions expecting ISO8601 datetime strings now also accept ISO8601 date strings
