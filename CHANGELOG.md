@@ -5,6 +5,14 @@ All notable changes to the "DIPS Arena Calc Expression Formatter" extension will
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.4.2] - 2026-01-07
+### Fixed
+- **Improved type checking for ISO8601 date/datetime compatibility** - Functions expecting ISO8601 datetime strings now also accept ISO8601 date strings
+  - `iso8601_datetime` type now accepts `iso8601_date` values (dates are valid for datetime operations, defaulting to midnight)
+- **Enhanced numeric type compatibility** - `number` type now accepts `ticks` values since ticks represent numeric timestamps
+- **More precise type error highlighting** - Type mismatch errors in expressions like `INT($var/7)` now highlight only the problematic variable (`$var`) instead of the entire expression, making it clearer what needs to be fixed
+- **Better type inference for arithmetic expressions** - When a text variable is used in arithmetic operations (e.g., `$textVar/7`), the type checker now correctly identifies the variable's type and flags the error, rather than assuming the entire expression is numeric
+
 ## [0.4.0] - 2026-01-06
 ### Added
 - **Custom functions system** - Define reusable macro-style functions that expand to complex expressions
