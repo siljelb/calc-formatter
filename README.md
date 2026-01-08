@@ -1,5 +1,7 @@
 # DIPS Arena Calc Expression Formatter
 
+> **⚠️ ARCHIVED**: This repository has been migrated to [https://codeberg.org/openEHR-no/calc-formatter](https://codeberg.org/openEHR-no/calc-formatter). This repository is now archived and will no longer receive updates.
+
 A Visual Studio Code extension for formatting, validating, and working with DIPS Arena calc expressions.
 
 ## Features
